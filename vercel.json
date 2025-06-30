@@ -18,7 +18,7 @@
     }
   ],
   "env": {
-    "NEXT_PUBLIC_APP_URL": "https://v0-pre-review-v2-5.vercel.app",
+    "NEXT_PUBLIC_APP_URL": "v0-pre-review-v2-5.vercel.app",
     "OPENAI_API_KEY": "@openai_api_key",
     "WEAVIATE_URL": "@weaviate_url",
     "WEAVIATE_API_KEY": "@weaviate_api_key"
