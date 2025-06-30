@@ -219,4 +219,3 @@ Provide a comprehensive analysis from your specialized perspective. Include spec
     return Math.min(1.0, Math.max(0.0, score))
   }
 }
-
