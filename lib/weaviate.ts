@@ -6,7 +6,7 @@ export function getWeaviateClient(): WeaviateClient {
   if (!client) {
     if (!process.env.WEAVIATE_API_KEY || !process.env.REST_ENDPOINT_URL) {
       throw new Error(
-        "Missing Weaviate configuration. Please set WEAVIATE_API_KEY and REST_ENDPOINT_URL environment variables.",
+        "Weaviate configuration missing. Please set WEAVIATE_API_KEY and REST_ENDPOINT_URL environment variables.",
       )
     }
 
@@ -20,156 +20,225 @@ export function getWeaviateClient(): WeaviateClient {
   return client
 }
 
-export async function initializeSchema() {
+export interface PhysicsKnowledge {
+  id?: string
+  concept: string
+  description: string
+  field: string
+  difficulty: string
+  equations?: string[]
+  applications?: string[]
+  relatedConcepts?: string[]
+  examples?: string[]
+}
+
+export interface ResearchPaper {
+  id?: string
+  title: string
+  authors: string[]
+  abstract: string
+  content: string
+  field: string
+  keywords: string[]
+  uploadDate: string
+  fileType: string
+}
+
+export interface AnalysisResult {
+  id?: string
+  paperId: string
+  analysisType: string
+  result: string
+  confidence: number
+  timestamp: string
+  agentId: string
+}
+
+export async function initializeWeaviateSchema() {
   const client = getWeaviateClient()
 
-  // Check if classes already exist
-  const schema = await client.schema.getter().do()
-  const existingClasses = schema.classes?.map((c: any) => c.class) || []
+  try {
+    // Check if classes already exist
+    const schema = await client.schema.getter().do()
+    const existingClasses = schema.classes?.map((c) => c.class) || []
 
-  // PhysicsKnowledge class
-  if (!existingClasses.includes("PhysicsKnowledge")) {
-    await client.schema
-      .classCreator()
-      .withClass({
-        class: "PhysicsKnowledge",
-        description: "Physics concepts, equations, and explanations",
-        vectorizer: "text2vec-openai",
-        moduleConfig: {
-          "text2vec-openai": {
-            model: "ada",
-            modelVersion: "002",
-            type: "text",
+    // Create PhysicsKnowledge class if it doesn't exist
+    if (!existingClasses.includes("PhysicsKnowledge")) {
+      await client.schema
+        .classCreator()
+        .withClass({
+          class: "PhysicsKnowledge",
+          description: "Physics concepts and knowledge base",
+          vectorizer: "text2vec-openai",
+          moduleConfig: {
+            "text2vec-openai": {
+              model: "ada",
+              modelVersion: "002",
+              type: "text",
+            },
           },
-        },
-        properties: [
-          {
-            name: "content",
-            dataType: ["text"],
-            description: "The main content or explanation",
+          properties: [
+            {
+              name: "concept",
+              dataType: ["text"],
+              description: "The physics concept name",
+            },
+            {
+              name: "description",
+              dataType: ["text"],
+              description: "Detailed description of the concept",
+            },
+            {
+              name: "field",
+              dataType: ["text"],
+              description: "Physics field (e.g., quantum mechanics, thermodynamics)",
+            },
+            {
+              name: "difficulty",
+              dataType: ["text"],
+              description: "Difficulty level (beginner, intermediate, advanced)",
+            },
+            {
+              name: "equations",
+              dataType: ["text[]"],
+              description: "Related equations",
+            },
+            {
+              name: "applications",
+              dataType: ["text[]"],
+              description: "Real-world applications",
+            },
+            {
+              name: "relatedConcepts",
+              dataType: ["text[]"],
+              description: "Related physics concepts",
+            },
+            {
+              name: "examples",
+              dataType: ["text[]"],
+              description: "Examples and use cases",
+            },
+          ],
+        })
+        .do()
+    }
+
+    // Create ResearchPaper class if it doesn't exist
+    if (!existingClasses.includes("ResearchPaper")) {
+      await client.schema
+        .classCreator()
+        .withClass({
+          class: "ResearchPaper",
+          description: "Research papers for analysis",
+          vectorizer: "text2vec-openai",
+          moduleConfig: {
+            "text2vec-openai": {
+              model: "ada",
+              modelVersion: "002",
+              type: "text",
+            },
           },
-          {
-            name: "title",
-            dataType: ["string"],
-            description: "Title or heading of the concept",
+          properties: [
+            {
+              name: "title",
+              dataType: ["text"],
+              description: "Paper title",
+            },
+            {
+              name: "authors",
+              dataType: ["text[]"],
+              description: "Paper authors",
+            },
+            {
+              name: "abstract",
+              dataType: ["text"],
+              description: "Paper abstract",
+            },
+            {
+              name: "content",
+              dataType: ["text"],
+              description: "Full paper content",
+            },
+            {
+              name: "field",
+              dataType: ["text"],
+              description: "Research field",
+            },
+            {
+              name: "keywords",
+              dataType: ["text[]"],
+              description: "Paper keywords",
+            },
+            {
+              name: "uploadDate",
+              dataType: ["text"],
+              description: "Upload timestamp",
+            },
+            {
+              name: "fileType",
+              dataType: ["text"],
+              description: "File type (pdf, txt, etc.)",
+            },
+          ],
+        })
+        .do()
+    }
+
+    // Create AnalysisResult class if it doesn't exist
+    if (!existingClasses.includes("AnalysisResult")) {
+      await client.schema
+        .classCreator()
+        .withClass({
+          class: "AnalysisResult",
+          description: "Multi-agent analysis results",
+          vectorizer: "text2vec-openai",
+          moduleConfig: {
+            "text2vec-openai": {
+              model: "ada",
+              modelVersion: "002",
+              type: "text",
+            },
           },
-          {
-            name: "topic",
-            dataType: ["string"],
-            description: "Physics topic (e.g., quantum mechanics, thermodynamics)",
-          },
-          {
-            name: "difficulty",
-            dataType: ["string"],
-            description: "Difficulty level: beginner, intermediate, advanced",
-          },
-          {
-            name: "equations",
-            dataType: ["string[]"],
-            description: "Mathematical equations related to this concept",
-          },
-          {
-            name: "concepts",
-            dataType: ["string[]"],
-            description: "Key physics concepts covered",
-          },
-          {
-            name: "source",
-            dataType: ["string"],
-            description: "Source textbook or reference",
-          },
-          {
-            name: "chapter",
-            dataType: ["string"],
-            description: "Chapter or section reference",
-          },
-        ],
-      })
-      .do()
+          properties: [
+            {
+              name: "paperId",
+              dataType: ["text"],
+              description: "Reference to analyzed paper",
+            },
+            {
+              name: "analysisType",
+              dataType: ["text"],
+              description: "Type of analysis performed",
+            },
+            {
+              name: "result",
+              dataType: ["text"],
+              description: "Analysis result content",
+            },
+            {
+              name: "confidence",
+              dataType: ["number"],
+              description: "Confidence score (0-1)",
+            },
+            {
+              name: "timestamp",
+              dataType: ["text"],
+              description: "Analysis timestamp",
+            },
+            {
+              name: "agentId",
+              dataType: ["text"],
+              description: "ID of the agent that performed analysis",
+            },
+          ],
+        })
+        .do()
+    }
+
+    console.log("Weaviate schema initialized successfully")
+    return true
+  } catch (error) {
+    console.error("Error initializing Weaviate schema:", error)
+    throw error
   }
-
-  // ResearchPaper class
-  if (!existingClasses.includes("ResearchPaper")) {
-    await client.schema
-      .classCreator()
-      .withClass({
-        class: "ResearchPaper",
-        description: "Uploaded research papers for analysis",
-        vectorizer: "text2vec-openai",
-        properties: [
-          {
-            name: "title",
-            dataType: ["string"],
-            description: "Paper title",
-          },
-          {
-            name: "content",
-            dataType: ["text"],
-            description: "Full paper content",
-          },
-          {
-            name: "abstract",
-            dataType: ["text"],
-            description: "Paper abstract",
-          },
-          {
-            name: "authors",
-            dataType: ["string[]"],
-            description: "Paper authors",
-          },
-          {
-            name: "uploadedAt",
-            dataType: ["date"],
-            description: "Upload timestamp",
-          },
-          {
-            name: "fileType",
-            dataType: ["string"],
-            description: "File type (pdf, tex, docx)",
-          },
-        ],
-      })
-      .do()
-  }
-
-  // AnalysisResult class
-  if (!existingClasses.includes("AnalysisResult")) {
-    await client.schema
-      .classCreator()
-      .withClass({
-        class: "AnalysisResult",
-        description: "Results from multi-agent paper analysis",
-        vectorizer: "text2vec-openai",
-        properties: [
-          {
-            name: "paperId",
-            dataType: ["string"],
-            description: "Reference to the analyzed paper",
-          },
-          {
-            name: "agentType",
-            dataType: ["string"],
-            description: "Type of analysis agent",
-          },
-          {
-            name: "analysis",
-            dataType: ["text"],
-            description: "Analysis content",
-          },
-          {
-            name: "score",
-            dataType: ["number"],
-            description: "Analysis score or rating",
-          },
-          {
-            name: "completedAt",
-            dataType: ["date"],
-            description: "Analysis completion timestamp",
-          },
-        ],
-      })
-      .do()
-  }
-
-  console.log("✅ Weaviate schema initialized successfully")
 }

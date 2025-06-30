@@ -1,73 +1,50 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { agentOrchestrator } from "@/lib/services/agent-orchestrator"
+import { AgentOrchestrator } from "@/lib/services/agent-orchestrator"
+import { getWeaviateClient } from "@/lib/weaviate"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { paperId, title, abstract, content } = body
-
-    // Validate required fields
-    if (!paperId || !title || !abstract || !content) {
-      return NextResponse.json({ error: "Missing required fields: paperId, title, abstract, content" }, { status: 400 })
-    }
-
-    // Start the analysis
-    const analysisRequest = {
-      paperId,
-      title,
-      abstract,
-      content,
-    }
-
-    const results = await agentOrchestrator.analyzePaper(analysisRequest)
-
-    return NextResponse.json({
-      success: true,
-      paperId,
-      results,
-      totalAgents: results.length,
-      averageScore: results.reduce((sum, r) => sum + r.score, 0) / results.length,
-      message: "Multi-agent analysis completed successfully",
-    })
-  } catch (error) {
-    console.error("Analysis start API error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to start analysis",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const paperId = searchParams.get("paperId")
+    const { paperId, analysisTypes } = body
 
     if (!paperId) {
-      return NextResponse.json({ error: "paperId parameter is required" }, { status: 400 })
+      return NextResponse.json({ error: "Paper ID is required" }, { status: 400 })
     }
 
-    const results = await agentOrchestrator.getAnalysisHistory(paperId)
+    // Get the paper from Weaviate
+    const client = getWeaviateClient()
+    const paperResult = await client.graphql
+      .get()
+      .withClassName("ResearchPaper")
+      .withFields("title authors abstract content field keywords uploadDate fileType")
+      .withWhere({
+        path: ["id"],
+        operator: "Equal",
+        valueText: paperId,
+      })
+      .do()
+
+    const papers = paperResult.data?.Get?.ResearchPaper
+    if (!papers || papers.length === 0) {
+      return NextResponse.json({ error: "Paper not found" }, { status: 404 })
+    }
+
+    const paper = papers[0]
+    const orchestrator = new AgentOrchestrator()
+
+    const analysisId = await orchestrator.startAnalysis({
+      paperId,
+      paper,
+      analysisTypes: analysisTypes || ["comprehensive"],
+    })
 
     return NextResponse.json({
       success: true,
-      paperId,
-      results,
-      total: results.length,
+      analysisId,
+      message: "Analysis started successfully",
     })
   } catch (error) {
-    console.error("Get analysis API error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to retrieve analysis",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    console.error("Start analysis error:", error)
+    return NextResponse.json({ error: "Failed to start analysis" }, { status: 500 })
   }
 }

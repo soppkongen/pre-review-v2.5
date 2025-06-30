@@ -1,219 +1,224 @@
-import { generateText } from "ai"
+import { streamText } from "ai"
 import { openai } from "@ai-sdk/openai"
-import { getWeaviateClient } from "../weaviate"
+import { getWeaviateClient, type ResearchPaper, type AnalysisResult } from "../weaviate"
 
-export interface AnalysisAgent {
+export interface Agent {
+  id: string
   name: string
   role: string
   systemPrompt: string
+  expertise: string[]
 }
 
-export interface AnalysisResult {
-  agentName: string
-  analysis: string
-  score: number
-  recommendations: string[]
-  confidence: number
-}
-
-export interface PaperAnalysisRequest {
+export interface AnalysisRequest {
   paperId: string
-  title: string
-  abstract: string
-  content: string
+  paper: ResearchPaper
+  analysisTypes: string[]
+}
+
+export interface AnalysisProgress {
+  agentId: string
+  agentName: string
+  status: "pending" | "running" | "completed" | "error"
+  progress: number
+  result?: string
+  error?: string
 }
 
 export class AgentOrchestrator {
-  private agents: AnalysisAgent[] = [
+  private client = getWeaviateClient()
+
+  private agents: Agent[] = [
     {
-      name: "Theory Validator",
-      role: "theoretical_analysis",
-      systemPrompt: `You are a theoretical physics expert specializing in validating theoretical frameworks and mathematical foundations in research papers. 
-      
-      Analyze papers for:
-      - Theoretical consistency and rigor
-      - Mathematical correctness
-      - Proper use of physical principles
-      - Novel theoretical contributions
-      - Connections to established theory
-      
-      Provide a score from 1-10 and specific recommendations for improvement.`,
+      id: "methodology-agent",
+      name: "Methodology Analyst",
+      role: "Research Methodology Expert",
+      systemPrompt: `You are a research methodology expert specializing in physics research. 
+                     Analyze the methodology, experimental design, and research approach of physics papers.
+                     Focus on: experimental setup, data collection methods, statistical analysis, 
+                     controls, validity, and reproducibility. Identify strengths and potential weaknesses.`,
+      expertise: ["experimental design", "statistical analysis", "research methods", "data collection"],
     },
     {
-      name: "Methodology Reviewer",
-      role: "methodology_analysis",
-      systemPrompt: `You are a research methodology expert focusing on experimental design, data analysis, and research methods in physics.
-      
-      Analyze papers for:
-      - Experimental design quality
-      - Statistical analysis appropriateness
-      - Data collection methods
-      - Control variables and bias
-      - Reproducibility of methods
-      
-      Provide a score from 1-10 and specific recommendations for improvement.`,
+      id: "theoretical-agent",
+      name: "Theoretical Physicist",
+      role: "Theoretical Analysis Expert",
+      systemPrompt: `You are a theoretical physicist expert. Analyze the theoretical framework, 
+                     mathematical formulations, and conceptual foundations of physics papers.
+                     Focus on: theoretical models, mathematical rigor, conceptual clarity, 
+                     theoretical predictions, and consistency with established physics principles.`,
+      expertise: ["theoretical physics", "mathematical modeling", "conceptual analysis", "theory validation"],
     },
     {
-      name: "Literature Specialist",
-      role: "literature_analysis",
-      systemPrompt: `You are a physics literature expert specializing in citation analysis, literature review quality, and positioning within the field.
-      
-      Analyze papers for:
-      - Completeness of literature review
-      - Proper citation of relevant work
-      - Identification of research gaps
-      - Positioning within current research
-      - Missing key references
-      
-      Provide a score from 1-10 and specific recommendations for improvement.`,
+      id: "novelty-agent",
+      name: "Innovation Assessor",
+      role: "Novelty and Impact Expert",
+      systemPrompt: `You are an expert in assessing scientific novelty and potential impact. 
+                     Evaluate the originality, significance, and potential impact of physics research.
+                     Focus on: novel contributions, advancement of knowledge, potential applications, 
+                     significance to the field, and comparison with existing work.`,
+      expertise: ["scientific novelty", "impact assessment", "literature comparison", "innovation evaluation"],
     },
     {
-      name: "Impact Assessor",
-      role: "impact_analysis",
-      systemPrompt: `You are a research impact specialist focusing on the potential significance and applications of physics research.
-      
-      Analyze papers for:
-      - Novelty and originality
-      - Potential impact on the field
-      - Practical applications
-      - Future research directions
-      - Broader scientific implications
-      
-      Provide a score from 1-10 and specific recommendations for improvement.`,
+      id: "technical-agent",
+      name: "Technical Reviewer",
+      role: "Technical Quality Expert",
+      systemPrompt: `You are a technical quality expert for physics research. Analyze technical 
+                     accuracy, clarity, and presentation quality of physics papers.
+                     Focus on: technical correctness, clarity of presentation, figure quality, 
+                     data interpretation, error analysis, and overall technical rigor.`,
+      expertise: ["technical accuracy", "data analysis", "presentation quality", "error assessment"],
     },
   ]
 
-  private client = getWeaviateClient()
-
-  async analyzeWithAgent(agent: AnalysisAgent, paper: PaperAnalysisRequest): Promise<AnalysisResult> {
+  async startAnalysis(request: AnalysisRequest): Promise<string> {
     try {
-      const { text } = await generateText({
-        model: openai("gpt-4o"),
-        system: agent.systemPrompt,
-        prompt: `Analyze this physics research paper:
+      const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-Title: ${paper.title}
+      // Store initial analysis record
+      await this.client.data
+        .creator()
+        .withClassName("AnalysisResult")
+        .withProperties({
+          paperId: request.paperId,
+          analysisType: "multi-agent-analysis",
+          result: JSON.stringify({ status: "started", analysisId }),
+          confidence: 0,
+          timestamp: new Date().toISOString(),
+          agentId: "orchestrator",
+        })
+        .do()
 
-Abstract: ${paper.abstract}
-
-Content: ${paper.content.substring(0, 4000)}...
-
-Please provide:
-1. A detailed analysis focusing on your area of expertise
-2. A numerical score from 1-10
-3. Specific recommendations for improvement
-4. Your confidence level in this analysis (0-1)
-
-Format your response as a structured analysis.`,
-      })
-
-      // Extract score and confidence from the response (simplified parsing)
-      const scoreMatch = text.match(/score[:\s]*(\d+(?:\.\d+)?)/i)
-      const confidenceMatch = text.match(/confidence[:\s]*(\d+(?:\.\d+)?)/i)
-
-      const score = scoreMatch ? Number.parseFloat(scoreMatch[1]) : 7.0
-      const confidence = confidenceMatch ? Number.parseFloat(confidenceMatch[1]) : 0.8
-
-      // Extract recommendations (simplified)
-      const recommendations = text
-        .split(/recommendations?[:\s]*/i)[1]
-        ?.split(/\n/)
-        .filter((line) => line.trim().length > 0)
-        .slice(0, 5) || ["Continue developing the research methodology", "Consider additional literature review"]
-
-      return {
-        agentName: agent.name,
-        analysis: text,
-        score: Math.min(Math.max(score, 1), 10), // Clamp between 1-10
-        recommendations,
-        confidence: Math.min(Math.max(confidence, 0), 1), // Clamp between 0-1
-      }
+      return analysisId
     } catch (error) {
-      console.error(`Error in ${agent.name} analysis:`, error)
-      return {
-        agentName: agent.name,
-        analysis: `Analysis temporarily unavailable due to system error. Please try again later.`,
-        score: 5.0,
-        recommendations: ["Retry analysis when system is available"],
-        confidence: 0.1,
-      }
+      console.error("Error starting analysis:", error)
+      throw new Error("Failed to start analysis")
     }
   }
 
-  async analyzePaper(paper: PaperAnalysisRequest): Promise<AnalysisResult[]> {
-    console.log(`Starting multi-agent analysis for paper: ${paper.title}`)
+  async *streamAnalysis(request: AnalysisRequest): AsyncGenerator<AnalysisProgress> {
+    const activeAgents = this.agents.filter(
+      (agent) =>
+        request.analysisTypes.some((type) => agent.expertise.includes(type)) ||
+        request.analysisTypes.includes("comprehensive"),
+    )
 
-    const results: AnalysisResult[] = []
+    if (activeAgents.length === 0) {
+      activeAgents.push(...this.agents) // Use all agents for comprehensive analysis
+    }
 
-    // Run all agents in parallel for efficiency
-    const analysisPromises = this.agents.map((agent) => this.analyzeWithAgent(agent, paper))
+    for (const agent of activeAgents) {
+      yield {
+        agentId: agent.id,
+        agentName: agent.name,
+        status: "running",
+        progress: 0,
+      }
 
-    try {
-      const agentResults = await Promise.all(analysisPromises)
-      results.push(...agentResults)
+      try {
+        const analysisPrompt = this.buildAnalysisPrompt(agent, request.paper)
 
-      // Store results in Weaviate
-      for (const result of agentResults) {
-        try {
-          await this.client.data
-            .creator()
-            .withClassName("AnalysisResult")
-            .withProperties({
-              paperId: paper.paperId,
-              agentType: result.agentName,
-              analysis: result.analysis,
-              score: result.score,
-              confidence: result.confidence,
-              recommendations: result.recommendations,
-              createdAt: new Date().toISOString(),
-            })
-            .do()
-        } catch (storageError) {
-          console.error("Error storing analysis result:", storageError)
+        let result = ""
+        let progress = 0
+
+        const stream = streamText({
+          model: openai("gpt-4o"),
+          system: agent.systemPrompt,
+          prompt: analysisPrompt,
+        })
+
+        for await (const chunk of stream.textStream) {
+          result += chunk
+          progress = Math.min(progress + 5, 90)
+
+          yield {
+            agentId: agent.id,
+            agentName: agent.name,
+            status: "running",
+            progress,
+          }
+        }
+
+        // Store the analysis result
+        await this.client.data
+          .creator()
+          .withClassName("AnalysisResult")
+          .withProperties({
+            paperId: request.paperId,
+            analysisType: agent.role,
+            result,
+            confidence: 0.85,
+            timestamp: new Date().toISOString(),
+            agentId: agent.id,
+          })
+          .do()
+
+        yield {
+          agentId: agent.id,
+          agentName: agent.name,
+          status: "completed",
+          progress: 100,
+          result,
+        }
+      } catch (error) {
+        console.error(`Error in agent ${agent.id}:`, error)
+        yield {
+          agentId: agent.id,
+          agentName: agent.name,
+          status: "error",
+          progress: 0,
+          error: error instanceof Error ? error.message : "Unknown error",
         }
       }
-
-      console.log(`Completed analysis for ${paper.title} with ${results.length} agent results`)
-    } catch (error) {
-      console.error("Error in multi-agent analysis:", error)
-      throw new Error("Multi-agent analysis failed")
     }
-
-    return results
   }
 
-  async getAnalysisHistory(paperId: string): Promise<AnalysisResult[]> {
+  private buildAnalysisPrompt(agent: Agent, paper: ResearchPaper): string {
+    return `Please analyze the following physics research paper from your perspective as a ${agent.role}:
+
+Title: ${paper.title}
+Authors: ${paper.authors.join(", ")}
+Field: ${paper.field}
+Keywords: ${paper.keywords.join(", ")}
+
+Abstract:
+${paper.abstract}
+
+Full Content:
+${paper.content.substring(0, 8000)}${paper.content.length > 8000 ? "..." : ""}
+
+Please provide a detailed analysis focusing on your area of expertise. Structure your response with:
+1. Executive Summary
+2. Detailed Analysis
+3. Strengths
+4. Areas for Improvement
+5. Recommendations
+6. Overall Assessment
+
+Be specific, constructive, and provide actionable feedback.`
+  }
+
+  async getAnalysisResults(paperId: string): Promise<AnalysisResult[]> {
     try {
       const result = await this.client.graphql
         .get()
         .withClassName("AnalysisResult")
-        .withFields("agentType analysis score confidence recommendations createdAt")
+        .withFields("paperId analysisType result confidence timestamp agentId")
         .withWhere({
           path: ["paperId"],
           operator: "Equal",
-          valueString: paperId,
+          valueText: paperId,
         })
-        .withSort([{ path: ["createdAt"], order: "desc" }])
         .do()
 
-      const analyses = result.data?.Get?.AnalysisResult || []
-
-      return analyses.map((item: any) => ({
-        agentName: item.agentType,
-        analysis: item.analysis,
-        score: item.score,
-        recommendations: item.recommendations || [],
-        confidence: item.confidence,
-      }))
+      return result.data?.Get?.AnalysisResult || []
     } catch (error) {
-      console.error("Error retrieving analysis history:", error)
-      return []
+      console.error("Error getting analysis results:", error)
+      throw new Error("Failed to get analysis results")
     }
   }
 
-  getAvailableAgents(): AnalysisAgent[] {
+  getAgents(): Agent[] {
     return this.agents
   }
 }
-
-export const agentOrchestrator = new AgentOrchestrator()

@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { KnowledgeBaseService } from "@/lib/services/knowledge-base"
 
-const knowledgeService = new KnowledgeBaseService()
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -10,79 +8,51 @@ export async function GET(request: NextRequest) {
     const limit = Number.parseInt(searchParams.get("limit") || "10")
 
     if (!query) {
-      return NextResponse.json({ error: "Query parameter 'q' is required" }, { status: 400 })
+      return NextResponse.json({ error: "Query parameter is required" }, { status: 400 })
     }
 
-    if (limit < 1 || limit > 50) {
-      return NextResponse.json({ error: "Limit must be between 1 and 50" }, { status: 400 })
-    }
-
-    const results = await knowledgeService.search(query, limit)
+    const knowledgeBase = new KnowledgeBaseService()
+    const results = await knowledgeBase.searchKnowledge(query, limit)
 
     return NextResponse.json({
-      success: true,
-      results,
-      total: results.length,
       query,
+      results,
+      count: results.length,
     })
   } catch (error) {
-    console.error("Knowledge search API error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to search knowledge base",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    console.error("Knowledge search error:", error)
+    return NextResponse.json({ error: "Failed to search knowledge base" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { content, title, topic, difficulty, equations, concepts, source, chapter } = body
+    const { concept, description, field, difficulty, equations, applications, relatedConcepts, examples } = body
 
-    // Validate required fields
-    if (!content || !title || !topic || !difficulty) {
-      return NextResponse.json({ error: "Missing required fields: content, title, topic, difficulty" }, { status: 400 })
+    if (!concept || !description || !field) {
+      return NextResponse.json({ error: "Concept, description, and field are required" }, { status: 400 })
     }
 
-    // Validate difficulty level
-    if (!["beginner", "intermediate", "advanced"].includes(difficulty)) {
-      return NextResponse.json(
-        { error: "Difficulty must be one of: beginner, intermediate, advanced" },
-        { status: 400 },
-      )
-    }
-
-    const knowledgeEntry = {
-      content,
-      title,
-      topic,
-      difficulty,
+    const knowledgeBase = new KnowledgeBaseService()
+    const id = await knowledgeBase.addKnowledge({
+      concept,
+      description,
+      field,
+      difficulty: difficulty || "intermediate",
       equations: equations || [],
-      concepts: concepts || [],
-      source: source || "",
-      chapter: chapter || "",
-    }
-
-    const id = await knowledgeService.addKnowledge(knowledgeEntry)
+      applications: applications || [],
+      relatedConcepts: relatedConcepts || [],
+      examples: examples || [],
+    })
 
     return NextResponse.json({
       success: true,
       id,
-      message: "Knowledge entry added successfully",
+      message: "Knowledge added successfully",
     })
   } catch (error) {
-    console.error("Add knowledge API error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to add knowledge entry",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    console.error("Add knowledge error:", error)
+    return NextResponse.json({ error: "Failed to add knowledge" }, { status: 500 })
   }
 }

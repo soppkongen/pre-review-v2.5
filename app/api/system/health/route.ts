@@ -1,68 +1,42 @@
 import { NextResponse } from "next/server"
 import { getWeaviateClient } from "@/lib/weaviate"
-import { openai } from "@ai-sdk/openai"
-import { generateText } from "ai"
 
 export async function GET() {
-  const healthChecks = {
-    weaviate: false,
-    openai: false,
-    system: true,
+  const health = {
+    status: "healthy",
     timestamp: new Date().toISOString(),
+    services: {
+      weaviate: "unknown",
+      openai: "unknown",
+    },
+    version: "1.0.0",
   }
 
-  let overallStatus = "healthy"
-
   try {
-    // Test Weaviate connection
+    // Check Weaviate connection
     const client = getWeaviateClient()
-    await client.misc.liveChecker().do()
-    healthChecks.weaviate = true
+    await client.misc.metaGetter().do()
+    health.services.weaviate = "healthy"
   } catch (error) {
     console.error("Weaviate health check failed:", error)
-    overallStatus = "degraded"
+    health.services.weaviate = "unhealthy"
+    health.status = "degraded"
   }
 
   try {
-    // Test OpenAI connection with a simple request
-    await generateText({
-      model: openai("gpt-4o"),
-      prompt: "Say 'OK' if you can respond.",
-      maxTokens: 5,
-    })
-    healthChecks.openai = true
+    // Check OpenAI API key presence
+    if (process.env.OPENAI_API_KEY) {
+      health.services.openai = "configured"
+    } else {
+      health.services.openai = "not configured"
+      health.status = "degraded"
+    }
   } catch (error) {
     console.error("OpenAI health check failed:", error)
-    overallStatus = "degraded"
+    health.services.openai = "error"
+    health.status = "degraded"
   }
 
-  // System health (basic checks)
-  const memoryUsage = process.memoryUsage()
-  const memoryUsagePercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100
-
-  if (memoryUsagePercent > 90) {
-    overallStatus = "degraded"
-    healthChecks.system = false
-  }
-
-  const statusCode = overallStatus === "healthy" ? 200 : 503
-
-  return NextResponse.json(
-    {
-      status: overallStatus,
-      checks: healthChecks,
-      details: {
-        uptime: process.uptime(),
-        memoryUsage: {
-          used: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-          total: Math.round(memoryUsage.heapTotal / 1024 / 1024),
-          percentage: Math.round(memoryUsagePercent),
-        },
-        nodeVersion: process.version,
-        platform: process.platform,
-      },
-      timestamp: healthChecks.timestamp,
-    },
-    { status: statusCode },
-  )
+  const statusCode = health.status === "healthy" ? 200 : 503
+  return NextResponse.json(health, { status: statusCode })
 }

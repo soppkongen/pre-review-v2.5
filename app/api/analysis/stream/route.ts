@@ -1,110 +1,56 @@
 import type { NextRequest } from "next/server"
-import { agentOrchestrator } from "@/lib/services/agent-orchestrator"
+import { AgentOrchestrator } from "@/lib/services/agent-orchestrator"
+import { getWeaviateClient } from "@/lib/weaviate"
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { paperId, title, abstract, content } = body
+    const { paperId, analysisTypes } = body
 
-    // Validate required fields
-    if (!paperId || !title || !abstract || !content) {
-      return new Response("Missing required fields", { status: 400 })
+    if (!paperId) {
+      return new Response("Paper ID is required", { status: 400 })
     }
 
-    // Create a readable stream for real-time updates
+    // Get the paper from Weaviate
+    const client = getWeaviateClient()
+    const paperResult = await client.graphql
+      .get()
+      .withClassName("ResearchPaper")
+      .withFields("title authors abstract content field keywords uploadDate fileType")
+      .withWhere({
+        path: ["id"],
+        operator: "Equal",
+        valueText: paperId,
+      })
+      .do()
+
+    const papers = paperResult.data?.Get?.ResearchPaper
+    if (!papers || papers.length === 0) {
+      return new Response("Paper not found", { status: 404 })
+    }
+
+    const paper = papers[0]
+    const orchestrator = new AgentOrchestrator()
+
+    const encoder = new TextEncoder()
     const stream = new ReadableStream({
       async start(controller) {
-        const encoder = new TextEncoder()
-
         try {
-          // Send initial status
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "status",
-                message: "Starting multi-agent analysis...",
-                progress: 0,
-              })}\n\n`,
-            ),
-          )
-
-          const analysisRequest = {
+          for await (const progress of orchestrator.streamAnalysis({
             paperId,
-            title,
-            abstract,
-            content,
+            paper,
+            analysisTypes: analysisTypes || ["comprehensive"],
+          })) {
+            const data = `data: ${JSON.stringify(progress)}\n\n`
+            controller.enqueue(encoder.encode(data))
           }
 
-          const agents = agentOrchestrator.getAvailableAgents()
-          const results = []
-
-          // Process each agent and stream results
-          for (let i = 0; i < agents.length; i++) {
-            const agent = agents[i]
-
-            // Send progress update
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "progress",
-                  message: `Analyzing with ${agent.name}...`,
-                  progress: (i / agents.length) * 100,
-                  currentAgent: agent.name,
-                })}\n\n`,
-              ),
-            )
-
-            try {
-              const result = await agentOrchestrator.analyzeWithAgent(agent, analysisRequest)
-              results.push(result)
-
-              // Send individual result
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "result",
-                    agent: agent.name,
-                    result,
-                    progress: ((i + 1) / agents.length) * 100,
-                  })}\n\n`,
-                ),
-              )
-            } catch (error) {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "error",
-                    agent: agent.name,
-                    error: error instanceof Error ? error.message : "Analysis failed",
-                  })}\n\n`,
-                ),
-              )
-            }
-          }
-
-          // Send completion
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "complete",
-                message: "Analysis completed",
-                results,
-                totalAgents: results.length,
-                averageScore: results.reduce((sum, r) => sum + r.score, 0) / results.length,
-              })}\n\n`,
-            ),
-          )
-
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"))
           controller.close()
         } catch (error) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: error instanceof Error ? error.message : "Stream failed",
-              })}\n\n`,
-            ),
-          )
+          console.error("Stream analysis error:", error)
+          const errorData = `data: ${JSON.stringify({ error: "Analysis failed" })}\n\n`
+          controller.enqueue(encoder.encode(errorData))
           controller.close()
         }
       },
@@ -118,7 +64,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Stream analysis API error:", error)
-    return new Response("Failed to start streaming analysis", { status: 500 })
+    console.error("Stream analysis setup error:", error)
+    return new Response("Failed to start analysis stream", { status: 500 })
   }
 }

@@ -1,247 +1,154 @@
-import { getWeaviateClient } from "../weaviate"
-
-export interface DocumentMetadata {
-  fileName: string
-  fileSize: number
-  fileType: string
-  uploadedAt: Date
-}
-
 export interface ProcessedDocument {
-  id: string
   title: string
   content: string
-  abstract?: string
-  authors?: string[]
-  keywords?: string[]
-  metadata: DocumentMetadata
+  metadata: {
+    fileType: string
+    size: number
+    pages?: number
+    wordCount: number
+  }
 }
 
 export class DocumentProcessor {
-  private client = getWeaviateClient()
-
   async processDocument(file: File): Promise<ProcessedDocument> {
+    const fileType = file.type || this.getFileTypeFromName(file.name)
+
     try {
-      // Extract text content based on file type
-      const content = await this.extractTextContent(file)
+      let content: string
+      let title: string
 
-      // Extract metadata and structure
-      const { title, abstract, authors, keywords } = await this.extractDocumentStructure(content)
-
-      const metadata: DocumentMetadata = {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type || this.getFileTypeFromName(file.name),
-        uploadedAt: new Date(),
+      switch (fileType) {
+        case "application/pdf":
+          ;({ content, title } = await this.processPDF(file))
+          break
+        case "text/plain":
+          ;({ content, title } = await this.processText(file))
+          break
+        case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+          ;({ content, title } = await this.processDocx(file))
+          break
+        case "application/x-tex":
+        case "text/x-tex":
+          ;({ content, title } = await this.processTeX(file))
+          break
+        default:
+          throw new Error(`Unsupported file type: ${fileType}`)
       }
 
-      // Store in Weaviate
-      const result = await this.client.data
-        .creator()
-        .withClassName("ResearchPaper")
-        .withProperties({
-          title,
-          content,
-          abstract: abstract || "",
-          authors: authors || [],
-          keywords: keywords || [],
-          uploadedAt: metadata.uploadedAt.toISOString(),
-          fileType: metadata.fileType,
-        })
-        .do()
+      const wordCount = this.countWords(content)
 
       return {
-        id: result.id,
-        title,
+        title: title || file.name,
         content,
-        abstract,
-        authors,
-        keywords,
-        metadata,
+        metadata: {
+          fileType,
+          size: file.size,
+          wordCount,
+        },
       }
     } catch (error) {
-      console.error("Document processing error:", error)
-      throw new Error("Failed to process document")
+      console.error("Error processing document:", error)
+      throw new Error(`Failed to process document: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
-  private async extractTextContent(file: File): Promise<string> {
-    try {
-      if (file.type === "text/plain" || file.name.endsWith(".txt")) {
-        return await file.text()
-      }
+  private async processPDF(file: File): Promise<{ content: string; title: string }> {
+    // For now, we'll return a placeholder since PDF processing requires additional libraries
+    // In a real implementation, you'd use libraries like pdf-parse or pdf2pic
+    const content = `[PDF Content - ${file.name}]\n\nThis is a placeholder for PDF content extraction. In a production environment, this would contain the actual extracted text from the PDF file.`
+    const title = file.name.replace(".pdf", "")
 
-      if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
-        // For PDF processing, we'd typically use a library like pdf-parse
-        // For now, return a placeholder that indicates PDF processing is needed
-        return `[PDF Content] - File: ${file.name}, Size: ${file.size} bytes. PDF text extraction would be implemented here using a PDF parsing library.`
-      }
-
-      if (file.name.endsWith(".tex")) {
-        const content = await file.text()
-        // Basic LaTeX processing - remove common commands
-        return content
-          .replace(/\\[a-zA-Z]+\{[^}]*\}/g, "") // Remove LaTeX commands
-          .replace(/\\[a-zA-Z]+/g, "") // Remove standalone commands
-          .replace(/\{|\}/g, "") // Remove braces
-          .replace(/\n\s*\n/g, "\n") // Clean up extra newlines
-          .trim()
-      }
-
-      // Default to text extraction
-      return await file.text()
-    } catch (error) {
-      console.error("Text extraction error:", error)
-      throw new Error("Failed to extract text from document")
-    }
+    return { content, title }
   }
 
-  private async extractDocumentStructure(content: string): Promise<{
-    title: string
-    abstract?: string
-    authors?: string[]
-    keywords?: string[]
-  }> {
-    try {
-      // Simple heuristic-based extraction
-      const lines = content.split("\n").map((line) => line.trim())
+  private async processText(file: File): Promise<{ content: string; title: string }> {
+    const content = await file.text()
+    const title = this.extractTitleFromText(content) || file.name.replace(".txt", "")
 
-      // Extract title (usually the first non-empty line or after \title{})
-      let title = "Untitled Document"
-      const titleMatch = content.match(/\\title\{([^}]+)\}/) || content.match(/^(.+)$/m)
-      if (titleMatch) {
-        title = titleMatch[1].trim()
-      }
-
-      // Extract abstract
-      let abstract: string | undefined
-      const abstractMatch =
-        content.match(/\\begin\{abstract\}([\s\S]*?)\\end\{abstract\}/) ||
-        content.match(/Abstract[:\s]+([\s\S]*?)(?:\n\s*\n|\n\s*[A-Z])/i)
-      if (abstractMatch) {
-        abstract = abstractMatch[1].trim()
-      }
-
-      // Extract authors
-      let authors: string[] | undefined
-      const authorMatch = content.match(/\\author\{([^}]+)\}/) || content.match(/Authors?[:\s]+([^\n]+)/i)
-      if (authorMatch) {
-        authors = authorMatch[1]
-          .split(/[,&]/)
-          .map((author) => author.trim())
-          .filter((author) => author.length > 0)
-      }
-
-      // Extract keywords
-      let keywords: string[] | undefined
-      const keywordMatch = content.match(/Keywords?[:\s]+([^\n]+)/i) || content.match(/\\keywords\{([^}]+)\}/)
-      if (keywordMatch) {
-        keywords = keywordMatch[1]
-          .split(/[,;]/)
-          .map((keyword) => keyword.trim())
-          .filter((keyword) => keyword.length > 0)
-      }
-
-      return {
-        title,
-        abstract,
-        authors,
-        keywords,
-      }
-    } catch (error) {
-      console.error("Document structure extraction error:", error)
-      return {
-        title: "Document Processing Error",
-      }
-    }
+    return { content, title }
   }
 
-  private getFileTypeFromName(fileName: string): string {
-    const extension = fileName.split(".").pop()?.toLowerCase()
+  private async processDocx(file: File): Promise<{ content: string; title: string }> {
+    // Placeholder for DOCX processing
+    // In production, you'd use libraries like mammoth or docx-parser
+    const content = `[DOCX Content - ${file.name}]\n\nThis is a placeholder for DOCX content extraction. In a production environment, this would contain the actual extracted text from the Word document.`
+    const title = file.name.replace(".docx", "")
+
+    return { content, title }
+  }
+
+  private async processTeX(file: File): Promise<{ content: string; title: string }> {
+    const content = await file.text()
+    const title = this.extractTitleFromTeX(content) || file.name.replace(/\.tex$/, "")
+
+    return { content, title }
+  }
+
+  private extractTitleFromText(content: string): string | null {
+    const lines = content.split("\n").slice(0, 10) // Check first 10 lines
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed.length > 10 && trimmed.length < 200) {
+        // Likely a title if it's not too short or too long
+        return trimmed
+      }
+    }
+
+    return null
+  }
+
+  private extractTitleFromTeX(content: string): string | null {
+    // Look for \title{...} command
+    const titleMatch = content.match(/\\title\{([^}]+)\}/)
+    if (titleMatch) {
+      return titleMatch[1].trim()
+    }
+
+    // Look for \section{...} as fallback
+    const sectionMatch = content.match(/\\section\{([^}]+)\}/)
+    if (sectionMatch) {
+      return sectionMatch[1].trim()
+    }
+
+    return null
+  }
+
+  private countWords(text: string): number {
+    return text
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length
+  }
+
+  private getFileTypeFromName(filename: string): string {
+    const extension = filename.toLowerCase().split(".").pop()
+
     switch (extension) {
       case "pdf":
         return "application/pdf"
-      case "tex":
-        return "application/x-tex"
       case "txt":
         return "text/plain"
       case "docx":
         return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      case "tex":
+        return "application/x-tex"
       default:
         return "application/octet-stream"
     }
   }
 
-  async getDocumentById(id: string): Promise<ProcessedDocument | null> {
-    try {
-      const result = await this.client.graphql
-        .get()
-        .withClassName("ResearchPaper")
-        .withFields("title content abstract authors keywords uploadedAt fileType")
-        .withWhere({
-          path: ["id"],
-          operator: "Equal",
-          valueString: id,
-        })
-        .withAdditional(["id"])
-        .do()
-
-      const papers = result.data?.Get?.ResearchPaper || []
-      if (papers.length === 0) return null
-
-      const paper = papers[0]
-      return {
-        id: paper._additional.id,
-        title: paper.title,
-        content: paper.content,
-        abstract: paper.abstract,
-        authors: paper.authors,
-        keywords: paper.keywords,
-        metadata: {
-          fileName: `${paper.title}.${paper.fileType?.split("/")[1] || "txt"}`,
-          fileSize: paper.content?.length || 0,
-          fileType: paper.fileType,
-          uploadedAt: new Date(paper.uploadedAt),
-        },
-      }
-    } catch (error) {
-      console.error("Get document error:", error)
-      return null
-    }
+  getSupportedFileTypes(): string[] {
+    return [
+      "application/pdf",
+      "text/plain",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/x-tex",
+      "text/x-tex",
+    ]
   }
 
-  async listDocuments(limit = 20): Promise<ProcessedDocument[]> {
-    try {
-      const result = await this.client.graphql
-        .get()
-        .withClassName("ResearchPaper")
-        .withFields("title content abstract authors keywords uploadedAt fileType")
-        .withLimit(limit)
-        .withSort([{ path: ["uploadedAt"], order: "desc" }])
-        .withAdditional(["id"])
-        .do()
-
-      const papers = result.data?.Get?.ResearchPaper || []
-
-      return papers.map((paper: any) => ({
-        id: paper._additional.id,
-        title: paper.title,
-        content: paper.content,
-        abstract: paper.abstract,
-        authors: paper.authors,
-        keywords: paper.keywords,
-        metadata: {
-          fileName: `${paper.title}.${paper.fileType?.split("/")[1] || "txt"}`,
-          fileSize: paper.content?.length || 0,
-          fileType: paper.fileType,
-          uploadedAt: new Date(paper.uploadedAt),
-        },
-      }))
-    } catch (error) {
-      console.error("List documents error:", error)
-      return []
-    }
+  getMaxFileSize(): number {
+    return 10 * 1024 * 1024 // 10MB
   }
 }
-
-export const documentProcessor = new DocumentProcessor()

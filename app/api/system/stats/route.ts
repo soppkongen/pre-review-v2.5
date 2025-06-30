@@ -1,91 +1,78 @@
 import { NextResponse } from "next/server"
-import { KnowledgeBaseService } from "@/lib/services/knowledge-base"
-import { documentProcessor } from "@/lib/services/document-processor"
 import { getWeaviateClient } from "@/lib/weaviate"
-
-const knowledgeService = new KnowledgeBaseService()
+import { KnowledgeBaseService } from "@/lib/services/knowledge-base"
 
 export async function GET() {
   try {
-    // Get knowledge base stats
-    const knowledgeStats = await knowledgeService.getStats()
-
-    // Get document stats
-    const documents = await documentProcessor.listDocuments(100)
-    const documentStats = {
-      totalDocuments: documents.length,
-      recentUploads: documents.filter((doc) => Date.now() - doc.metadata.uploadedAt.getTime() < 7 * 24 * 60 * 60 * 1000)
-        .length,
-      fileTypes: documents.reduce(
-        (acc, doc) => {
-          const type = doc.metadata.fileType.split("/")[1] || "unknown"
-          acc[type] = (acc[type] || 0) + 1
-          return acc
-        },
-        {} as Record<string, number>,
-      ),
-    }
-
-    // Get analysis stats
     const client = getWeaviateClient()
-    let analysisStats = {
-      totalAnalyses: 0,
-      recentAnalyses: 0,
-      agentDistribution: {} as Record<string, number>,
-      averageScore: 0,
-    }
+    const knowledgeBase = new KnowledgeBaseService()
 
-    try {
-      const analysisResult = await client.graphql
-        .get()
-        .withClassName("AnalysisResult")
-        .withFields("agentType score createdAt")
-        .withLimit(1000)
-        .do()
+    // Get knowledge base stats
+    const knowledgeStats = await knowledgeBase.getKnowledgeStats()
 
-      const analyses = analysisResult.data?.Get?.AnalysisResult || []
-      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    // Get research papers count
+    const papersResult = await client.graphql
+      .aggregate()
+      .withClassName("ResearchPaper")
+      .withFields("meta { count }")
+      .do()
 
-      analysisStats = {
-        totalAnalyses: analyses.length,
-        recentAnalyses: analyses.filter((a: any) => new Date(a.createdAt) > oneWeekAgo).length,
-        agentDistribution: analyses.reduce((acc: Record<string, number>, analysis: any) => {
-          acc[analysis.agentType] = (acc[analysis.agentType] || 0) + 1
-          return acc
-        }, {}),
-        averageScore:
-          analyses.length > 0 ? analyses.reduce((sum: number, a: any) => sum + (a.score || 0), 0) / analyses.length : 0,
-      }
-    } catch (error) {
-      console.warn("Could not fetch analysis stats:", error)
-    }
+    const totalPapers = papersResult.data?.Aggregate?.ResearchPaper?.[0]?.meta?.count || 0
 
-    // System performance stats
-    const systemStats = {
-      uptime: process.uptime(),
-      memoryUsage: process.memoryUsage(),
-      nodeVersion: process.version,
-      platform: process.platform,
-      timestamp: new Date().toISOString(),
-    }
+    // Get analysis results count
+    const analysisResult = await client.graphql
+      .aggregate()
+      .withClassName("AnalysisResult")
+      .withFields("meta { count }")
+      .do()
+
+    const totalAnalyses = analysisResult.data?.Aggregate?.AnalysisResult?.[0]?.meta?.count || 0
+
+    // Get recent activity (last 24 hours)
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const recentPapers = await client.graphql
+      .get()
+      .withClassName("ResearchPaper")
+      .withFields("uploadDate")
+      .withWhere({
+        path: ["uploadDate"],
+        operator: "GreaterThan",
+        valueText: yesterday.toISOString(),
+      })
+      .do()
+
+    const recentUploads = recentPapers.data?.Get?.ResearchPaper?.length || 0
 
     return NextResponse.json({
-      success: true,
-      stats: {
-        knowledge: knowledgeStats,
-        documents: documentStats,
-        analysis: analysisStats,
-        system: systemStats,
+      knowledge: {
+        totalConcepts: knowledgeStats.totalConcepts,
+        fieldDistribution: knowledgeStats.fieldDistribution,
+        difficultyDistribution: knowledgeStats.difficultyDistribution,
       },
-      timestamp: new Date().toISOString(),
+      papers: {
+        total: totalPapers,
+        recentUploads,
+      },
+      analyses: {
+        total: totalAnalyses,
+      },
+      system: {
+        status: "operational",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+      },
     })
   } catch (error) {
-    console.error("System stats API error:", error)
+    console.error("System stats error:", error)
     return NextResponse.json(
       {
-        success: false,
-        error: "Failed to retrieve system statistics",
-        message: error instanceof Error ? error.message : "Unknown error",
+        error: "Failed to get system statistics",
+        system: {
+          status: "error",
+          timestamp: new Date().toISOString(),
+        },
       },
       { status: 500 },
     )
