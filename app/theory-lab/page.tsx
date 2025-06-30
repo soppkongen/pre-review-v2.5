@@ -1,6 +1,4 @@
-"use client"
-
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -40,6 +38,12 @@ interface Agent {
   active: boolean
 }
 
+interface AnalysisResult {
+  agentId: string
+  analysis: string
+  timestamp: string
+}
+
 export default function TheoryLabPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -53,7 +57,12 @@ export default function TheoryLabPage() {
   ])
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([])
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const agents: Agent[] = [
     {
@@ -98,65 +107,104 @@ export default function TheoryLabPage() {
     },
   ]
 
-  const [analysisResults, setAnalysisResults] = useState([])
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  // Cleanup function for EventSource
+  const cleanupEventSource = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [])
 
-  const startAnalysis = async (paperContent: string, paperTitle: string) => {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupEventSource()
+    }
+  }, [cleanupEventSource])
+
+  const startAnalysis = useCallback(async (paperContent: string, paperTitle: string) => {
+    // Cleanup any existing connections
+    cleanupEventSource()
+    
     setIsAnalyzing(true)
     setAnalysisResults([])
 
     try {
-      // Use Server-Sent Events for real-time updates
-      const eventSource = new EventSource(
-        `/api/analysis/stream?paperContent=${encodeURIComponent(paperContent)}&paperTitle=${encodeURIComponent(paperTitle)}`,
-      )
+      const url = `/api/analysis/stream?paperContent=${encodeURIComponent(paperContent)}&paperTitle=${encodeURIComponent(paperTitle)}`
+      const eventSource = new EventSource(url)
+      eventSourceRef.current = eventSource
+
+      // Set timeout to prevent infinite connections
+      timeoutRef.current = setTimeout(() => {
+        cleanupEventSource()
+        setIsAnalyzing(false)
+        console.warn("Analysis timeout - connection closed")
+      }, 300000) // 5 minute timeout
 
       eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data)
+        try {
+          const data = JSON.parse(event.data)
 
-        if (data.type === "analysis-chunk") {
-          // Update the specific agent's analysis in real-time
-          setAnalysisResults((prev) => {
-            const updated = [...prev]
-            const existingIndex = updated.findIndex((r) => r.agentId === data.agentId)
+          if (data.type === "analysis-chunk") {
+            setAnalysisResults((prev) => {
+              const updated = [...prev]
+              const existingIndex = updated.findIndex((r) => r.agentId === data.agentId)
 
-            if (existingIndex >= 0) {
-              updated[existingIndex].analysis += data.chunk
-            } else {
-              updated.push({
-                agentId: data.agentId,
-                analysis: data.chunk,
-                timestamp: data.timestamp,
-              })
-            }
+              if (existingIndex >= 0) {
+                updated[existingIndex] = {
+                  ...updated[existingIndex],
+                  analysis: updated[existingIndex].analysis + data.chunk
+                }
+              } else {
+                updated.push({
+                  agentId: data.agentId,
+                  analysis: data.chunk,
+                  timestamp: data.timestamp,
+                })
+              }
 
-            return updated
-          })
-        } else if (data.type === "analysis-complete") {
-          setIsAnalyzing(false)
-          eventSource.close()
-        } else if (data.type === "error") {
-          console.error("Analysis error:", data.error)
-          setIsAnalyzing(false)
-          eventSource.close()
+              return updated
+            })
+          } else if (data.type === "analysis-complete") {
+            setIsAnalyzing(false)
+            cleanupEventSource()
+          } else if (data.type === "error") {
+            console.error("Analysis error:", data.error)
+            setIsAnalyzing(false)
+            cleanupEventSource()
+          }
+        } catch (parseError) {
+          console.error("Failed to parse event data:", parseError)
         }
       }
+
+      eventSource.onerror = (error) => {
+        console.error("EventSource error:", error)
+        setIsAnalyzing(false)
+        cleanupEventSource()
+      }
+
     } catch (error) {
       console.error("Analysis start error:", error)
       setIsAnalyzing(false)
+      cleanupEventSource()
     }
-  }
+  }, [cleanupEventSource])
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [messages, scrollToBottom])
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
+  const handleSendMessage = useCallback(async () => {
+    if (!inputMessage.trim() || isTyping) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -169,51 +217,52 @@ export default function TheoryLabPage() {
     setInputMessage("")
     setIsTyping(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        {
-          agent: "theorist",
-          content:
-            "That's a fascinating concept! From a theoretical perspective, we need to consider the fundamental symmetries involved. The mathematical framework would likely require extending current field theory to account for these new interactions.",
-        },
-        {
-          agent: "mathematician",
-          content:
-            "Let me work through the mathematical implications. If we assume a Lagrangian of the form L = ψ†(iγμDμ - m)ψ + additional terms, we need to ensure gauge invariance and renormalizability.",
-        },
-        {
-          agent: "coordinator",
-          content:
-            "Based on the theoretical and mathematical analysis, I suggest we focus on three key areas: 1) Developing the mathematical formalism, 2) Identifying testable predictions, and 3) Connecting to existing experimental data.",
-        },
-      ]
+    // Simulate AI response with proper cleanup
+    const responses = [
+      {
+        agent: "theorist",
+        content:
+          "That's a fascinating concept! From a theoretical perspective, we need to consider the fundamental symmetries involved. The mathematical framework would likely require extending current field theory to account for these new interactions.",
+      },
+      {
+        agent: "mathematician",
+        content:
+          "Let me work through the mathematical implications. If we assume a Lagrangian of the form L = ψ†(iγμDμ - m)ψ + additional terms, we need to ensure gauge invariance and renormalizability.",
+      },
+      {
+        agent: "coordinator",
+        content:
+          "Based on the theoretical and mathematical analysis, I suggest we focus on three key areas: 1) Developing the mathematical formalism, 2) Identifying testable predictions, and 3) Connecting to existing experimental data.",
+      },
+    ]
 
+    // Use timeout with cleanup
+    const responseTimeout = setTimeout(() => {
       responses.forEach((response, index) => {
-        setTimeout(
-          () => {
-            const assistantMessage: Message = {
-              id: (Date.now() + index).toString(),
-              role: "assistant",
-              content: response.content,
-              agent: response.agent,
-              timestamp: new Date(),
-            }
-            setMessages((prev) => [...prev, assistantMessage])
+        setTimeout(() => {
+          const assistantMessage: Message = {
+            id: (Date.now() + index).toString(),
+            role: "assistant",
+            content: response.content,
+            agent: response.agent,
+            timestamp: new Date(),
+          }
+          setMessages((prev) => [...prev, assistantMessage])
 
-            if (index === responses.length - 1) {
-              setIsTyping(false)
-            }
-          },
-          (index + 1) * 1500,
-        )
+          if (index === responses.length - 1) {
+            setIsTyping(false)
+          }
+        }, (index + 1) * 1500)
       })
     }, 1000)
-  }
 
-  const getAgentInfo = (agentId: string) => {
+    // Cleanup timeout on unmount
+    return () => clearTimeout(responseTimeout)
+  }, [inputMessage, isTyping])
+
+  const getAgentInfo = useCallback((agentId: string) => {
     return agents.find((agent) => agent.id === agentId) || agents[0]
-  }
+  }, [agents])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -424,11 +473,11 @@ export default function TheoryLabPage() {
                       <div className="space-y-2">
                         <div className="p-2 bg-gray-50 rounded text-xs">
                           <div className="font-medium">Weinberg, S. (1995)</div>
-                          <div>Quantum Theory of Fields</div>
+                          <div>The Quantum Theory of Fields</div>
                         </div>
                         <div className="p-2 bg-gray-50 rounded text-xs">
-                          <div className="font-medium">Peskin & Schroeder</div>
-                          <div>Introduction to QFT</div>
+                          <div className="font-medium">Peskin & Schroeder (1995)</div>
+                          <div>An Introduction to Quantum Field Theory</div>
                         </div>
                       </div>
                     </div>
@@ -437,33 +486,28 @@ export default function TheoryLabPage() {
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start text-sm bg-transparent">
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  Generate Ideas
-                </Button>
-                <Button variant="outline" className="w-full justify-start text-sm bg-transparent">
-                  <Calculator className="h-4 w-4 mr-2" />
-                  Check Math
-                </Button>
-                <Button variant="outline" className="w-full justify-start text-sm bg-transparent">
-                  <Search className="h-4 w-4 mr-2" />
-                  Find References
-                </Button>
-                <Button variant="outline" className="w-full justify-start text-sm bg-transparent">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Export Notes
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Analysis Results */}
+            {analysisResults.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Analysis Results</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {analysisResults.map((result) => (
+                      <div key={result.agentId} className="p-3 bg-gray-50 rounded">
+                        <div className="font-medium text-sm mb-1">{getAgentInfo(result.agentId).name}</div>
+                        <div className="text-xs text-gray-600">{result.analysis.substring(0, 100)}...</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
+

@@ -1,70 +1,167 @@
 import type { NextRequest } from "next/server"
 import { AgentOrchestrator } from "@/lib/services/agent-orchestrator"
-import { getWeaviateClient } from "@/lib/weaviate"
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { paperId, analysisTypes } = body
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const paperContent = searchParams.get("paperContent")
+  const paperTitle = searchParams.get("paperTitle")
 
-    if (!paperId) {
-      return new Response("Paper ID is required", { status: 400 })
-    }
-
-    // Get the paper from Weaviate
-    const client = getWeaviateClient()
-    const paperResult = await client.graphql
-      .get()
-      .withClassName("ResearchPaper")
-      .withFields("title authors abstract content field keywords uploadDate fileType")
-      .withWhere({
-        path: ["id"],
-        operator: "Equal",
-        valueText: paperId,
-      })
-      .do()
-
-    const papers = paperResult.data?.Get?.ResearchPaper
-    if (!papers || papers.length === 0) {
-      return new Response("Paper not found", { status: 404 })
-    }
-
-    const paper = papers[0]
-    const orchestrator = new AgentOrchestrator()
-
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const progress of orchestrator.streamAnalysis({
-            paperId,
-            paper,
-            analysisTypes: analysisTypes || ["comprehensive"],
-          })) {
-            const data = `data: ${JSON.stringify(progress)}\n\n`
-            controller.enqueue(encoder.encode(data))
-          }
-
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"))
-          controller.close()
-        } catch (error) {
-          console.error("Stream analysis error:", error)
-          const errorData = `data: ${JSON.stringify({ error: "Analysis failed" })}\n\n`
-          controller.enqueue(encoder.encode(errorData))
-          controller.close()
-        }
-      },
-    })
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    })
-  } catch (error) {
-    console.error("Stream analysis setup error:", error)
-    return new Response("Failed to start analysis stream", { status: 500 })
+  if (!paperContent || !paperTitle) {
+    return new Response("Missing required parameters", { status: 400 })
   }
+
+  const encoder = new TextEncoder()
+  let isCompleted = false
+  
+  const stream = new ReadableStream({
+    async start(controller) {
+      // Set up timeout to prevent infinite streams
+      const timeout = setTimeout(() => {
+        if (!isCompleted) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "Analysis timeout - please try again",
+              })}\n\n`,
+            ),
+          )
+          controller.close()
+          isCompleted = true
+        }
+      }, 300000) // 5 minute timeout
+
+      try {
+        const orchestrator = new AgentOrchestrator()
+        const agents = orchestrator.getAgents()
+
+        // Send initial message
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "analysis-start",
+              message: "Starting multi-agent analysis...",
+              totalAgents: agents.length,
+            })}\n\n`,
+          ),
+        )
+
+        // Process each agent with error handling
+        for (let i = 0; i < agents.length && !isCompleted; i++) {
+          const agent = agents[i]
+
+          try {
+            // Send progress update
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "agent-start",
+                  agentId: agent.id,
+                  agentName: agent.name,
+                  progress: Math.round((i / agents.length) * 100),
+                })}\n\n`,
+              ),
+            )
+
+            // Add timeout for individual agent analysis
+            const agentTimeout = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error("Agent timeout")), 60000) // 1 minute per agent
+            })
+
+            const analysisPromise = orchestrator.analyzeWithAgent(agent.id, paperContent, paperTitle)
+            
+            const result = await Promise.race([analysisPromise, agentTimeout])
+
+            if (!isCompleted) {
+              // Send agent result in chunks to prevent large payloads
+              const resultText = typeof result === 'string' ? result : result.analysis || 'Analysis completed'
+              const chunks = resultText.match(/.{1,500}/g) || [resultText]
+              
+              for (const chunk of chunks) {
+                if (!isCompleted) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "analysis-chunk",
+                        agentId: agent.id,
+                        chunk: chunk,
+                        timestamp: new Date().toISOString(),
+                      })}\n\n`,
+                    ),
+                  )
+                }
+              }
+
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "agent-complete",
+                    agentId: agent.id,
+                    agentName: agent.name,
+                  })}\n\n`,
+                ),
+              )
+            }
+          } catch (error) {
+            console.error(`Agent ${agent.id} failed:`, error)
+            if (!isCompleted) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "agent-error",
+                    agentId: agent.id,
+                    error: error instanceof Error ? error.message : "Analysis failed",
+                  })}\n\n`,
+                ),
+              )
+            }
+          }
+        }
+
+        // Send completion message
+        if (!isCompleted) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "analysis-complete",
+                message: "Multi-agent analysis completed",
+              })}\n\n`,
+            ),
+          )
+        }
+      } catch (error) {
+        console.error("Stream error:", error)
+        if (!isCompleted) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "error",
+                error: error instanceof Error ? error.message : "Analysis failed",
+              })}\n\n`,
+            ),
+          )
+        }
+      } finally {
+        clearTimeout(timeout)
+        isCompleted = true
+        controller.close()
+      }
+    },
+    
+    cancel() {
+      isCompleted = true
+    }
+  })
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  })
 }
+

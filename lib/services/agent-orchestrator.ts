@@ -1,224 +1,222 @@
-import { streamText } from "ai"
+import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
-import { getWeaviateClient, type ResearchPaper, type AnalysisResult } from "../weaviate"
 
 export interface Agent {
   id: string
   name: string
   role: string
   systemPrompt: string
-  expertise: string[]
 }
 
-export interface AnalysisRequest {
-  paperId: string
-  paper: ResearchPaper
-  analysisTypes: string[]
-}
-
-export interface AnalysisProgress {
+export interface AnalysisResult {
   agentId: string
   agentName: string
-  status: "pending" | "running" | "completed" | "error"
-  progress: number
-  result?: string
-  error?: string
+  analysis: string
+  score: number
+  timestamp: Date
 }
 
 export class AgentOrchestrator {
-  private client = getWeaviateClient()
-
   private agents: Agent[] = [
     {
-      id: "methodology-agent",
-      name: "Methodology Analyst",
-      role: "Research Methodology Expert",
-      systemPrompt: `You are a research methodology expert specializing in physics research. 
-                     Analyze the methodology, experimental design, and research approach of physics papers.
-                     Focus on: experimental setup, data collection methods, statistical analysis, 
-                     controls, validity, and reproducibility. Identify strengths and potential weaknesses.`,
-      expertise: ["experimental design", "statistical analysis", "research methods", "data collection"],
-    },
-    {
-      id: "theoretical-agent",
+      id: "theoretical-physicist",
       name: "Theoretical Physicist",
-      role: "Theoretical Analysis Expert",
-      systemPrompt: `You are a theoretical physicist expert. Analyze the theoretical framework, 
-                     mathematical formulations, and conceptual foundations of physics papers.
-                     Focus on: theoretical models, mathematical rigor, conceptual clarity, 
-                     theoretical predictions, and consistency with established physics principles.`,
-      expertise: ["theoretical physics", "mathematical modeling", "conceptual analysis", "theory validation"],
+      role: "Theory Analysis",
+      systemPrompt: `You are a theoretical physicist specializing in evaluating the theoretical foundations of research papers. 
+      Focus on:
+      - Mathematical rigor and consistency
+      - Theoretical framework validity
+      - Novel theoretical contributions
+      - Connection to established physics principles
+      - Potential theoretical implications
+      
+      Provide constructive analysis with specific examples and suggestions. Keep responses under 1000 words.`,
     },
     {
-      id: "novelty-agent",
-      name: "Innovation Assessor",
-      role: "Novelty and Impact Expert",
-      systemPrompt: `You are an expert in assessing scientific novelty and potential impact. 
-                     Evaluate the originality, significance, and potential impact of physics research.
-                     Focus on: novel contributions, advancement of knowledge, potential applications, 
-                     significance to the field, and comparison with existing work.`,
-      expertise: ["scientific novelty", "impact assessment", "literature comparison", "innovation evaluation"],
+      id: "experimental-physicist",
+      name: "Experimental Physicist",
+      role: "Experimental Design",
+      systemPrompt: `You are an experimental physicist evaluating the experimental aspects of research papers.
+      Focus on:
+      - Experimental design and methodology
+      - Data analysis and statistical validity
+      - Measurement techniques and instrumentation
+      - Error analysis and uncertainty quantification
+      - Reproducibility and experimental controls
+      
+      Provide practical feedback on experimental approaches. Keep responses under 1000 words.`,
     },
     {
-      id: "technical-agent",
-      name: "Technical Reviewer",
-      role: "Technical Quality Expert",
-      systemPrompt: `You are a technical quality expert for physics research. Analyze technical 
-                     accuracy, clarity, and presentation quality of physics papers.
-                     Focus on: technical correctness, clarity of presentation, figure quality, 
-                     data interpretation, error analysis, and overall technical rigor.`,
-      expertise: ["technical accuracy", "data analysis", "presentation quality", "error assessment"],
+      id: "peer-reviewer",
+      name: "Peer Reviewer",
+      role: "Academic Review",
+      systemPrompt: `You are an experienced academic peer reviewer evaluating research papers for publication.
+      Focus on:
+      - Overall scientific contribution and novelty
+      - Literature review completeness
+      - Writing clarity and organization
+      - Methodology appropriateness
+      - Conclusions supported by evidence
+      
+      Provide balanced feedback suitable for academic publication. Keep responses under 1000 words.`,
+    },
+    {
+      id: "epistemic-analyst",
+      name: "Epistemic Analyst",
+      role: "Paradigm Analysis",
+      systemPrompt: `You are an epistemic analyst specializing in identifying paradigm biases and institutional assumptions.
+      Focus on:
+      - Hidden assumptions and paradigm lock-in
+      - Alternative theoretical frameworks
+      - Institutional bias detection
+      - Paradigm independence assessment
+      - Epistemic archaeology of concepts
+      
+      Challenge conventional thinking and identify overlooked perspectives. Keep responses under 1000 words.`,
     },
   ]
 
-  async startAnalysis(request: AnalysisRequest): Promise<string> {
-    try {
-      const analysisId = `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  private lastRequestTime = 0
+  private readonly minRequestInterval = 1000 // 1 second between requests
+  private readonly maxRetries = 3
 
-      // Store initial analysis record
-      await this.client.data
-        .creator()
-        .withClassName("AnalysisResult")
-        .withProperties({
-          paperId: request.paperId,
-          analysisType: "multi-agent-analysis",
-          result: JSON.stringify({ status: "started", analysisId }),
-          confidence: 0,
-          timestamp: new Date().toISOString(),
-          agentId: "orchestrator",
-        })
-        .do()
-
-      return analysisId
-    } catch (error) {
-      console.error("Error starting analysis:", error)
-      throw new Error("Failed to start analysis")
+  private async rateLimitedRequest<T>(fn: () => Promise<T>): Promise<T> {
+    const now = Date.now()
+    const timeSinceLastRequest = now - this.lastRequestTime
+    
+    if (timeSinceLastRequest < this.minRequestInterval) {
+      await new Promise(resolve => setTimeout(resolve, this.minRequestInterval - timeSinceLastRequest))
     }
+    
+    this.lastRequestTime = Date.now()
+    return fn()
   }
 
-  async *streamAnalysis(request: AnalysisRequest): AsyncGenerator<AnalysisProgress> {
-    const activeAgents = this.agents.filter(
-      (agent) =>
-        request.analysisTypes.some((type) => agent.expertise.includes(type)) ||
-        request.analysisTypes.includes("comprehensive"),
-    )
-
-    if (activeAgents.length === 0) {
-      activeAgents.push(...this.agents) // Use all agents for comprehensive analysis
+  async analyzeWithAgent(agentId: string, paperContent: string, paperTitle: string): Promise<AnalysisResult> {
+    const agent = this.agents.find((a) => a.id === agentId)
+    if (!agent) {
+      throw new Error(`Agent ${agentId} not found`)
     }
 
-    for (const agent of activeAgents) {
-      yield {
-        agentId: agent.id,
-        agentName: agent.name,
-        status: "running",
-        progress: 0,
-      }
-
+    let lastError: Error | null = null
+    
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        const analysisPrompt = this.buildAnalysisPrompt(agent, request.paper)
+        const result = await this.rateLimitedRequest(async () => {
+          // Truncate content if too long to prevent API limits
+          const truncatedContent = paperContent.length > 8000 
+            ? paperContent.substring(0, 8000) + "... [content truncated]"
+            : paperContent
 
-        let result = ""
-        let progress = 0
+          const { text } = await generateText({
+            model: openai("gpt-4o-mini"), // Use mini model for better rate limits
+            system: agent.systemPrompt,
+            prompt: `Please analyze the following research paper:
 
-        const stream = streamText({
-          model: openai("gpt-4o"),
-          system: agent.systemPrompt,
-          prompt: analysisPrompt,
+Title: ${paperTitle}
+
+Content: ${truncatedContent}
+
+Provide a comprehensive analysis from your specialized perspective. Include specific observations, strengths, weaknesses, and recommendations.`,
+            maxTokens: 1500, // Limit response length
+            temperature: 0.3,
+          })
+
+          return text
         })
 
-        for await (const chunk of stream.textStream) {
-          result += chunk
-          progress = Math.min(progress + 5, 90)
+        // Calculate score based on analysis quality
+        const score = this.calculateScore(result)
 
-          yield {
-            agentId: agent.id,
-            agentName: agent.name,
-            status: "running",
-            progress,
-          }
-        }
-
-        // Store the analysis result
-        await this.client.data
-          .creator()
-          .withClassName("AnalysisResult")
-          .withProperties({
-            paperId: request.paperId,
-            analysisType: agent.role,
-            result,
-            confidence: 0.85,
-            timestamp: new Date().toISOString(),
-            agentId: agent.id,
-          })
-          .do()
-
-        yield {
+        return {
           agentId: agent.id,
           agentName: agent.name,
-          status: "completed",
-          progress: 100,
-          result,
+          analysis: result,
+          score,
+          timestamp: new Date(),
         }
       } catch (error) {
-        console.error(`Error in agent ${agent.id}:`, error)
-        yield {
-          agentId: agent.id,
-          agentName: agent.name,
-          status: "error",
-          progress: 0,
-          error: error instanceof Error ? error.message : "Unknown error",
+        lastError = error instanceof Error ? error : new Error(String(error))
+        console.error(`Analysis attempt ${attempt} failed for agent ${agentId}:`, lastError.message)
+        
+        if (attempt < this.maxRetries) {
+          // Exponential backoff
+          const delay = Math.pow(2, attempt) * 1000
+          await new Promise(resolve => setTimeout(resolve, delay))
         }
       }
     }
-  }
 
-  private buildAnalysisPrompt(agent: Agent, paper: ResearchPaper): string {
-    return `Please analyze the following physics research paper from your perspective as a ${agent.role}:
-
-Title: ${paper.title}
-Authors: ${paper.authors.join(", ")}
-Field: ${paper.field}
-Keywords: ${paper.keywords.join(", ")}
-
-Abstract:
-${paper.abstract}
-
-Full Content:
-${paper.content.substring(0, 8000)}${paper.content.length > 8000 ? "..." : ""}
-
-Please provide a detailed analysis focusing on your area of expertise. Structure your response with:
-1. Executive Summary
-2. Detailed Analysis
-3. Strengths
-4. Areas for Improvement
-5. Recommendations
-6. Overall Assessment
-
-Be specific, constructive, and provide actionable feedback.`
-  }
-
-  async getAnalysisResults(paperId: string): Promise<AnalysisResult[]> {
-    try {
-      const result = await this.client.graphql
-        .get()
-        .withClassName("AnalysisResult")
-        .withFields("paperId analysisType result confidence timestamp agentId")
-        .withWhere({
-          path: ["paperId"],
-          operator: "Equal",
-          valueText: paperId,
-        })
-        .do()
-
-      return result.data?.Get?.AnalysisResult || []
-    } catch (error) {
-      console.error("Error getting analysis results:", error)
-      throw new Error("Failed to get analysis results")
+    // If all retries failed, return a fallback result
+    return {
+      agentId: agent.id,
+      agentName: agent.name,
+      analysis: `Analysis failed after ${this.maxRetries} attempts. Error: ${lastError?.message || 'Unknown error'}`,
+      score: 0,
+      timestamp: new Date(),
     }
+  }
+
+  async analyzeWithAllAgents(paperContent: string, paperTitle: string): Promise<AnalysisResult[]> {
+    const results: AnalysisResult[] = []
+
+    // Process agents sequentially to avoid rate limits
+    for (const agent of this.agents) {
+      try {
+        const result = await this.analyzeWithAgent(agent.id, paperContent, paperTitle)
+        results.push(result)
+      } catch (error) {
+        console.error(`Failed to analyze with agent ${agent.id}:`, error)
+        // Add fallback result instead of skipping
+        results.push({
+          agentId: agent.id,
+          agentName: agent.name,
+          analysis: `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          score: 0,
+          timestamp: new Date(),
+        })
+      }
+    }
+
+    return results
   }
 
   getAgents(): Agent[] {
-    return this.agents
+    return [...this.agents] // Return copy to prevent mutation
+  }
+
+  private calculateScore(analysis: string): number {
+    // Improved scoring algorithm
+    let score = 0.3 // Base score
+
+    // Length factor (reasonable length gets higher score)
+    const wordCount = analysis.split(" ").length
+    if (wordCount > 100 && wordCount < 2000) {
+      score += 0.2
+    }
+    if (wordCount > 300 && wordCount < 1500) {
+      score += 0.1
+    }
+
+    // Quality indicators
+    const qualityIndicators = [
+      "specific", "detailed", "comprehensive", "rigorous", "methodology",
+      "evidence", "analysis", "recommendation", "improvement", "strength",
+      "weakness", "observation", "conclusion", "framework", "approach"
+    ]
+
+    const foundIndicators = qualityIndicators.filter((indicator) => 
+      analysis.toLowerCase().includes(indicator)
+    ).length
+
+    score += (foundIndicators / qualityIndicators.length) * 0.3
+
+    // Penalize error messages
+    if (analysis.toLowerCase().includes("error") || analysis.toLowerCase().includes("failed")) {
+      score = Math.max(0, score - 0.3)
+    }
+
+    return Math.min(1.0, Math.max(0.0, score))
   }
 }
+
