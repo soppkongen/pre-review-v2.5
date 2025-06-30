@@ -7,7 +7,7 @@
   "outputDirectory": ".next",
  
     }
-  },
+ 
   "rewrites": [
     {
       "source": "/api/(.*)",
