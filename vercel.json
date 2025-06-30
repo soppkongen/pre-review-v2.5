@@ -19,16 +19,16 @@
   ],
   "env": {
     "NEXT_PUBLIC_APP_URL": "v0-pre-review-v2-5.vercel.app",
-    "OPENAI_API_KEY": "@openai_api_key",
-    "WEAVIATE_URL": "@weaviate_url",
-    "WEAVIATE_API_KEY": "@weaviate_api_key"
+    "OPENAI_API_KEY": "openai_api_key",
+    "WEAVIATE_URL": "weaviate_url",
+    "WEAVIATE_API_KEY": "weaviate_api_key"
   },
   "build": {
     "env": {
-      "NEXT_PUBLIC_APP_URL": "@app_url",
-      "OPENAI_API_KEY": "@openai_api_key",
-      "WEAVIATE_URL": "@weaviate_url",
-      "WEAVIATE_API_KEY": "@weaviate_api_key"
+      "NEXT_PUBLIC_APP_URL": "v0-pre-review-v2-5.vercel.app",
+      "OPENAI_API_KEY": "openai_api_key",
+      "WEAVIATE_URL": "weaviate_url",
+      "WEAVIATE_API_KEY": "weaviate_api_key"
     }
   },
   "headers": [
