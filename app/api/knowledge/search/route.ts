@@ -1,58 +1,49 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { KnowledgeBaseService } from "@/lib/services/knowledge-base"
+import { NextRequest, NextResponse } from 'next/server'
+import { getWeaviateClient } from '@/lib/weaviate'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const query = searchParams.get("q")
-    const limit = Number.parseInt(searchParams.get("limit") || "10")
+    const query = searchParams.get('q')
+    const limit = parseInt(searchParams.get('limit') || '10')
 
     if (!query) {
-      return NextResponse.json({ error: "Query parameter is required" }, { status: 400 })
+      return NextResponse.json({ error: 'Query parameter is required' }, { status: 400 })
     }
 
-    const knowledgeBase = new KnowledgeBaseService()
-    const results = await knowledgeBase.searchKnowledge(query, limit)
+    console.log('Using existing Weaviate client from lib/weaviate.ts')
+    const client = getWeaviateClient()
 
-    return NextResponse.json({
-      query,
-      results,
-      count: results.length,
-    })
-  } catch (error) {
-    console.error("Knowledge search error:", error)
-    return NextResponse.json({ error: "Failed to search knowledge base" }, { status: 500 })
-  }
-}
+    // Query the actual PhysicsChunk class that contains your data
+    const result = await client.graphql
+      .get()
+      .withClassName('PhysicsChunk')
+      .withFields('chunkId content sourceDocument domain subdomain concepts difficultyLevel')
+      .withNearText({ concepts: [query] })
+      .withLimit(limit)
+      .do()
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { concept, description, field, difficulty, equations, applications, relatedConcepts, examples } = body
+    console.log('Weaviate result:', JSON.stringify(result, null, 2))
 
-    if (!concept || !description || !field) {
-      return NextResponse.json({ error: "Concept, description, and field are required" }, { status: 400 })
-    }
-
-    const knowledgeBase = new KnowledgeBaseService()
-    const id = await knowledgeBase.addKnowledge({
-      concept,
-      description,
-      field,
-      difficulty: difficulty || "intermediate",
-      equations: equations || [],
-      applications: applications || [],
-      relatedConcepts: relatedConcepts || [],
-      examples: examples || [],
-    })
+    const results = result.data?.Get?.PhysicsChunk || []
 
     return NextResponse.json({
       success: true,
-      id,
-      message: "Knowledge added successfully",
+      results: results.map((item: any) => ({
+        title: item.domain || item.subdomain || 'Physics Concept',
+        content: item.content || '',
+        source: item.sourceDocument || 'Knowledge Base',
+        confidence: 0.8,
+        concepts: item.concepts || [],
+        difficulty: item.difficultyLevel || 'Unknown'
+      }))
     })
+
   } catch (error) {
-    console.error("Add knowledge error:", error)
-    return NextResponse.json({ error: "Failed to add knowledge" }, { status: 500 })
+    console.error('Search error:', error)
+    return NextResponse.json(
+      { error: 'Search failed', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
   }
 }
