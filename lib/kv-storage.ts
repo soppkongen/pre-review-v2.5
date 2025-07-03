@@ -1,17 +1,22 @@
 import { Redis } from '@upstash/redis'
 
-if (!process.env.KV_REST_API_URL) {
-  throw new Error('KV_REST_API_URL is not defined')
-}
-if (!process.env.KV_REST_API_TOKEN) {
-  throw new Error('KV_REST_API_TOKEN is not defined')
+// Initialize Redis client with Vercel KV credentials
+const getRedisClient = () => {
+  if (!process.env.KV_REST_API_URL) {
+    throw new Error('KV_REST_API_URL is not defined')
+  }
+  if (!process.env.KV_REST_API_TOKEN) {
+    throw new Error('KV_REST_API_TOKEN is not defined')
+  }
+
+  return new Redis({
+    url: process.env.KV_REST_API_URL,
+    token: process.env.KV_REST_API_TOKEN
+  })
 }
 
-// Initialize Redis client with Vercel KV credentials
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN
-})
+// Create the redis client lazily
+let redis: Redis | null = null
 
 export interface AnalysisResult {
   analysisId: string
@@ -46,9 +51,16 @@ export interface AnalysisResult {
 }
 
 export class AnalysisStorage {
+  private static getRedis(): Redis {
+    if (!redis) {
+      redis = getRedisClient()
+    }
+    return redis
+  }
+
   static async ping(): Promise<boolean> {
     try {
-      const result = await redis.ping()
+      const result = await this.getRedis().ping()
       return result === 'PONG'
     } catch (error) {
       console.error('Storage ping failed:', error)
@@ -58,11 +70,9 @@ export class AnalysisStorage {
 
   static async storeAnalysis(analysisId: string, result: AnalysisResult): Promise<void> {
     try {
-      // Check if result is already a string
-      const resultString = typeof result === 'string' ? result : JSON.stringify(result)
-      await redis.set(`analysis:${analysisId}`, resultString)
-      // Set expiration to 30 days
-      await redis.expire(`analysis:${analysisId}`, 30 * 24 * 60 * 60)
+      const resultString = JSON.stringify(result)
+      await this.getRedis().set(`analysis:${analysisId}`, resultString)
+      await this.getRedis().expire(`analysis:${analysisId}`, 30 * 24 * 60 * 60)
     } catch (error) {
       console.error('Error storing analysis:', error)
       throw new Error('Failed to store analysis result')
@@ -71,15 +81,11 @@ export class AnalysisStorage {
 
   static async getAnalysis(analysisId: string): Promise<AnalysisResult | null> {
     try {
-      const result = await redis.get(`analysis:${analysisId}`)
+      const result = await this.getRedis().get(`analysis:${analysisId}`)
       if (!result) return null
       
-      // Handle both string and object responses from Redis
-      if (typeof result === 'object') {
-        return result as AnalysisResult
-      }
-      
-      return JSON.parse(result) as AnalysisResult
+      // Always parse the result as we always store it as a string
+      return JSON.parse(result as string) as AnalysisResult
     } catch (error) {
       console.error('Error retrieving analysis:', error)
       throw error
@@ -94,11 +100,11 @@ export class AnalysisStorage {
     try {
       const existingResult = await this.getAnalysis(analysisId)
       if (!existingResult) {
-        // If no existing result, create a new one
+        // Create a new result if none exists
         const newResult: AnalysisResult = {
           analysisId,
-          documentName: 'Unknown',  // We don't have this info at this point
-          reviewMode: 'standard',   // Default value
+          documentName: 'Unknown',
+          reviewMode: 'standard',
           status,
           timestamp: new Date().toISOString()
         }
