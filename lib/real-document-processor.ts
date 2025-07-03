@@ -1,4 +1,3 @@
-import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -131,15 +130,19 @@ export class RealDocumentProcessor {
   /**
    * Process PDF file with real PDF parsing
    */
-  private static async processPDF(file: File): Promise<{ text: string; pages: number }> {
-    const buffer = await file.arrayBuffer()
-    const data = await pdfParse(Buffer.from(buffer))
-    
-    return {
-      text: data.text,
-      pages: data.numpages
-    }
+private static async processPDF(file: File): Promise<{ text: string; pages: number }> {
+  const buffer = await file.arrayBuffer()
+  
+  // Dynamic import to prevent debug mode during build
+  const pdfParse = (await import('pdf-parse')).default
+  const data = await pdfParse(Buffer.from(buffer))
+  
+  return {
+    text: data.text,
+    pages: data.numpages
   }
+}
+
 
   /**
    * Process DOCX file with real DOCX parsing
