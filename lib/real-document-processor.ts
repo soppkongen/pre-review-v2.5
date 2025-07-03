@@ -59,10 +59,7 @@ export class RealDocumentProcessor {
   private static readonly CHUNK_SIZE = 1000 // characters per chunk
   private static readonly CHUNK_OVERLAP = 200 // overlap between chunks
 
-  /**
-   * Process a file and extract text content with real parsing
-   */
-    static async processFile(file: File): Promise<ProcessedDocument> {
+  static async processFile(file: File): Promise<ProcessedDocument> {
     const startTime = Date.now()
     try {
       let text: string = '';
@@ -166,111 +163,25 @@ export class RealDocumentProcessor {
     }
   }
 
-      const processingTime = Date.now() - startTime
-
-      return {
-        chunks,
-        metadata: {
-          fileName: file.name,
-          fileType: file.type,
-          totalPages,
-          wordCount: text.split(/\s+/).length,
-          processingTime,
-          title,
-          authors,
-          abstract
-        }
-      }
-    } catch (error) {
-      console.error('Document processing error:', error)
-      // Return a minimal valid document structure instead of throwing
-      return {
-        chunks: [{
-          id: `${file.name}-error-chunk`,
-          content: 'Error processing document',
-          metadata: {
-            source: file.name,
-            chunkIndex: 0,
-            totalChunks: 1
-          }
-        }],
-        metadata: {
-          fileName: file.name,
-          fileType: file.type,
-          wordCount: 0,
-          processingTime: Date.now() - startTime
-        }
-      }
-    }
-  }
-
-    const processingTime = Date.now() - startTime
-
+  private static async processPDF(file: File): Promise<{ text: string; pages: number }> {
+    const buffer = await file.arrayBuffer()
+    
+    // Dynamic import to prevent debug mode during build
+    const pdfParse = (await import('pdf-parse')).default
+    const data = await pdfParse(Buffer.from(buffer))
+    
     return {
-      chunks,
-      metadata: {
-        fileName: file.name,
-        fileType: file.type,
-        totalPages,
-        wordCount: text.split(/\s+/).length,
-        processingTime,
-        title,
-        authors,
-        abstract
-      }
-    }
-  } catch (error) {
-    console.error('Document processing error:', error)
-    // Return a minimal valid document structure instead of throwing
-    return {
-      chunks: [{
-        id: `${file.name}-error-chunk`,
-        content: 'Error processing document',
-        metadata: {
-          source: file.name,
-          chunkIndex: 0,
-          totalChunks: 1
-        }
-      }],
-      metadata: {
-        fileName: file.name,
-        fileType: file.type,
-        wordCount: 0,
-        processingTime: Date.now() - startTime
-      }
+      text: data.text,
+      pages: data.numpages
     }
   }
-}
 
-  /**
-   * Process PDF file with real PDF parsing
-   */
-private static async processPDF(file: File): Promise<{ text: string; pages: number }> {
-  const buffer = await file.arrayBuffer()
-  
-  // Dynamic import to prevent debug mode during build
-  const pdfParse = (await import('pdf-parse')).default
-  const data = await pdfParse(Buffer.from(buffer))
-  
-  return {
-    text: data.text,
-    pages: data.numpages
-  }
-}
-
-
-  /**
-   * Process DOCX file with real DOCX parsing
-   */
   private static async processDocx(file: File): Promise<string> {
     const buffer = await file.arrayBuffer()
     const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) })
     return result.value
   }
 
-  /**
-   * Process text/LaTeX file with metadata extraction
-   */
   private static async processText(file: File): Promise<{ text: string; title?: string; authors?: string[]; abstract?: string }> {
     const text = await file.text()
     
@@ -293,25 +204,15 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     return { text, title, authors, abstract }
   }
 
-  /**
-   * Clean and normalize text
-   */
   private static cleanText(text: string): string {
     return text
-      // Remove excessive whitespace
       .replace(/\s+/g, ' ')
-      // Remove special characters that might interfere with processing
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
-      // Normalize line breaks
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
-      // Trim
       .trim()
   }
 
-  /**
-   * Create intelligent chunks with physics domain analysis
-   */
   private static createIntelligentChunks(text: string, fileName: string): DocumentChunk[] {
     const chunks: DocumentChunk[] = []
     
@@ -346,9 +247,6 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     return chunks
   }
 
-  /**
-   * Create chunks from text with overlap
-   */
   private static createChunksFromText(text: string, fileName: string, startIndex: number, section?: string): DocumentChunk[] {
     const chunks: DocumentChunk[] = []
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0)
@@ -360,23 +258,20 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
       const sentence = sentences[i].trim()
       if (!sentence) continue
       
-      // Check if adding this sentence would exceed chunk size
       if (currentChunk.length + sentence.length > this.CHUNK_SIZE && currentChunk.length > 0) {
-        // Create chunk
         chunks.push({
           id: `${fileName}-chunk-${chunkIndex}`,
           content: currentChunk.trim(),
           metadata: {
             source: fileName,
             chunkIndex,
-            totalChunks: 0, // Will be updated later
+            totalChunks: 0,
             section
           }
         })
         
-        // Start new chunk with overlap
         const words = currentChunk.split(' ')
-        const overlapWords = words.slice(-Math.floor(this.CHUNK_OVERLAP / 6)) // Approximate word overlap
+        const overlapWords = words.slice(-Math.floor(this.CHUNK_OVERLAP / 6))
         currentChunk = overlapWords.join(' ') + ' ' + sentence
         chunkIndex++
       } else {
@@ -384,7 +279,6 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
       }
     }
     
-    // Add final chunk if there's content
     if (currentChunk.trim()) {
       chunks.push({
         id: `${fileName}-chunk-${chunkIndex}`,
@@ -401,13 +295,9 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     return chunks
   }
 
-  /**
-   * Extract sections from academic paper
-   */
   private static extractSections(text: string): { [key: string]: string } {
     const sections: { [key: string]: string } = {}
     
-    // Common academic paper sections
     const sectionPatterns = [
       { name: 'abstract', pattern: /(?:abstract|summary)\s*:?\s*(.*?)(?=\n\s*(?:introduction|keywords|1\.|background|method))/is },
       { name: 'introduction', pattern: /(?:introduction|1\.?\s*introduction)\s*:?\s*(.*?)(?=\n\s*(?:2\.|background|method|related work|literature))/is },
@@ -419,12 +309,11 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     
     for (const { name, pattern } of sectionPatterns) {
       const match = text.match(pattern)
-      if (match && match[1] && match[1].trim().length > 100) { // Only include substantial sections
+      if (match && match[1] && match[1].trim().length > 100) {
         sections[name] = match[1].trim()
       }
     }
     
-    // If no sections found, return the whole text
     if (Object.keys(sections).length === 0) {
       sections['full_text'] = text
     }
@@ -432,15 +321,11 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     return sections
   }
 
-  /**
-   * Extract title from text
-   */
   private static extractTitle(text: string): string | undefined {
-    // Try various title patterns
     const titlePatterns = [
-      /^(.{10,100})\n\n/m, // First line if followed by double newline
+      /^(.{10,100})\n\n/m,
       /title:\s*(.+)/i,
-      /^(.{10,80})$/m // First substantial line
+      /^(.{10,80})$/m
     ]
     
     for (const pattern of titlePatterns) {
@@ -456,9 +341,6 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     return undefined
   }
 
-  /**
-   * Extract authors from text
-   */
   private static extractAuthors(text: string): string[] | undefined {
     const authorPatterns = [
       /authors?:\s*(.+)/i,
@@ -469,7 +351,6 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
       const match = text.match(pattern)
       if (match && match[1]) {
         const authorsText = match[1].trim()
-        // Split by common separators
         const authors = authorsText.split(/[,;&]/).map(a => a.trim()).filter(a => a.length > 2)
         if (authors.length > 0) {
           return authors
@@ -480,9 +361,6 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     return undefined
   }
 
-  /**
-   * Extract abstract from text
-   */
   private static extractAbstract(text: string): string | undefined {
     const abstractPatterns = [
       /abstract\s*:?\s*(.*?)(?=\n\s*(?:introduction|keywords|1\.|background))/is,
@@ -502,89 +380,10 @@ private static async processPDF(file: File): Promise<{ text: string; pages: numb
     return undefined
   }
 
-  /**
-   * Classify physics domain
-   */
   private static classifyPhysicsDomain(content: string): string {
     const lowerContent = content.toLowerCase()
     let maxScore = 0
     let bestDomain = 'general'
 
     for (const [domain, keywords] of Object.entries(PHYSICS_DOMAINS)) {
-      const score = keywords.reduce((acc, keyword) => {
-        const regex = new RegExp(keyword, 'gi')
-        const matches = lowerContent.match(regex)
-        return acc + (matches ? matches.length : 0)
-      }, 0)
-
-      if (score > maxScore) {
-        maxScore = score
-        bestDomain = domain
-      }
-    }
-
-    return bestDomain
-  }
-
-  /**
-   * Extract physics concepts
-   */
-  private static extractPhysicsConcepts(content: string): string[] {
-    const concepts: string[] = []
-    const lowerContent = content.toLowerCase()
-    
-    // Extract concepts from all domains
-    Object.values(PHYSICS_DOMAINS).flat().forEach(keyword => {
-      if (lowerContent.includes(keyword)) {
-        concepts.push(keyword)
-      }
-    })
-    
-    return [...new Set(concepts)]
-  }
-
-  /**
-   * Extract mathematical content
-   */
-  private static extractMathematicalContent(content: string): string[] {
-    const equations: string[] = []
-    
-    MATH_PATTERNS.forEach(pattern => {
-      const matches = content.match(pattern)
-      if (matches) {
-        equations.push(...matches)
-      }
-    })
-    
-    return [...new Set(equations)] // Remove duplicates
-  }
-
-  /**
-   * Assess difficulty level
-   */
-  private static assessDifficultyLevel(content: string): string {
-    const lowerContent = content.toLowerCase()
-    
-    // Advanced physics terms
-    const advancedTerms = [
-      'tensor', 'manifold', 'gauge', 'symmetry', 'renormalization', 'topology',
-      'group theory', 'lie algebra', 'differential geometry', 'field theory'
-    ]
-    
-    // Intermediate physics terms
-    const intermediateTerms = [
-      'derivative', 'integral', 'matrix', 'vector', 'differential', 'eigenvalue',
-      'fourier', 'laplacian', 'gradient', 'divergence'
-    ]
-    
-    const advancedCount = advancedTerms.reduce((acc, term) => 
-      acc + (lowerContent.includes(term) ? 1 : 0), 0)
-    const intermediateCount = intermediateTerms.reduce((acc, term) => 
-      acc + (lowerContent.includes(term) ? 1 : 0), 0)
-    
-    if (advancedCount > 2) return 'advanced'
-    if (intermediateCount > 2 || advancedCount > 0) return 'intermediate'
-    return 'beginner'
-  }
-}
-
+      
