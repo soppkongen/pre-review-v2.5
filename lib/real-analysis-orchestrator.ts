@@ -57,7 +57,7 @@ export class RealAnalysisOrchestrator {
   /**
    * Async document processing pipeline
    */
-   private static async processDocumentAsync(
+     private static async processDocumentAsync(
     analysisId: string,
     file: File,
     summary?: string,
@@ -151,30 +151,6 @@ export class RealAnalysisOrchestrator {
       throw error // Re-throw to be caught by the route handler
     }
   }
-    
-    await AnalysisStorage.storeAnalysis(analysisId, result)
-    console.log(`Analysis completed for ${file.name} in ${processingTime}ms`)
-    
-  } catch (error) {
-    console.error(`Error processing document ${file.name}:`, error)
-    
-    // Store error result
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`Updating analysis status to failed with error: ${errorMsg}`)
-    
-    try {
-      await AnalysisStorage.updateAnalysisStatus(
-        analysisId,
-        'failed',
-        errorMsg
-      )
-    } catch (storageError) {
-      console.error('Failed to update analysis status:', storageError)
-    }
-    
-    throw error // Re-throw to be caught by the route handler
-  }
-}
   /**
    * Gather relevant knowledge from Weaviate
    */
