@@ -57,68 +57,100 @@ export class RealAnalysisOrchestrator {
   /**
    * Async document processing pipeline
    */
-  private static async processDocumentAsync(
-  analysisId: string,
-  file: File,
-  summary?: string,
-  reviewMode: string = 'full'
-): Promise<void> {
-  const startTime = Date.now()
-  
-  try {
-    // Step 1: Initialize Weaviate schema
-    await initializeWeaviateSchema()
+   private static async processDocumentAsync(
+    analysisId: string,
+    file: File,
+    summary?: string,
+    reviewMode: string = 'full'
+  ): Promise<void> {
+    const startTime = Date.now()
     
-    // Step 2: Process document and extract chunks
-    console.log(`Processing document: ${file.name}`)
-    const processedDoc = await RealDocumentProcessor.processFile(file)
-    
-    if (!processedDoc || !processedDoc.chunks) {
-      throw new Error('Document processing failed - no chunks generated')
-    }
+    try {
+      // Step 1: Initialize Weaviate schema
+      await initializeWeaviateSchema()
+      
+      // Step 2: Process document and extract chunks
+      console.log(`Processing document: ${file.name}`)
+      const processedDoc = await RealDocumentProcessor.processFile(file)
+      
+      if (!processedDoc || !processedDoc.chunks || processedDoc.chunks.length === 0) {
+        throw new Error('Document processing failed - no valid chunks generated')
+      }
 
-    console.log(`Generated ${processedDoc.chunks.length} chunks`)
-    
-    // Step 3: Store chunks in Weaviate
-    console.log(`Storing ${processedDoc.chunks.length} chunks in Weaviate`)
-    for (const chunk of processedDoc.chunks) {
-      if (!chunk) continue // Skip null/undefined chunks
-      await storePhysicsChunk(chunk)
-    }
-    
-    // Step 4: Retrieve relevant knowledge from Weaviate
-    const relevantKnowledge = await this.gatherRelevantKnowledge(processedDoc, summary)
-    
-    if (!relevantKnowledge) {
-      console.warn('No relevant knowledge found, proceeding with empty knowledge base')
-    }
+      // Log successful chunk generation
+      console.log(`Generated ${processedDoc.chunks.length} chunks`)
+      
+      // Step 3: Store chunks in Weaviate
+      console.log(`Storing ${processedDoc.chunks.length} chunks in Weaviate`)
+      let storedChunks = 0
+      for (const chunk of processedDoc.chunks) {
+        try {
+          if (!chunk) continue // Skip null/undefined chunks
+          await storePhysicsChunk(chunk)
+          storedChunks++
+        } catch (error) {
+          console.error('Error storing chunk:', error)
+          // Continue with other chunks
+        }
+      }
+      
+      if (storedChunks === 0) {
+        throw new Error('Failed to store any document chunks')
+      }
 
-    // Step 5: Run multi-agent analysis
-    const agentAnalyses = await this.runMultiAgentAnalysis(
-      processedDoc,
-      relevantKnowledge || [],
-      reviewMode
-    )
-    
-    // Step 6: Generate comprehensive analysis
-    const finalAnalysis = await this.generateFinalAnalysis(
-      processedDoc,
-      agentAnalyses || [],
-      relevantKnowledge || []
-    )
-    
-    // Step 7: Store final result
-    const processingTime = Date.now() - startTime
-    const result: AnalysisResult = {
-      analysisId,
-      documentName: file.name,
-      reviewMode,
-      summary,
-      status: 'completed',
-      ...finalAnalysis,
-      timestamp: new Date().toISOString(),
-      processingTimeMs: processingTime
+      // Step 4: Retrieve relevant knowledge from Weaviate
+      const relevantKnowledge = await this.gatherRelevantKnowledge(processedDoc, summary)
+      
+      // Step 5: Run multi-agent analysis
+      const agentAnalyses = await this.runMultiAgentAnalysis(
+        processedDoc,
+        relevantKnowledge || [],
+        reviewMode
+      )
+      
+      // Step 6: Generate final analysis
+      const finalAnalysis = await this.generateFinalAnalysis(
+        processedDoc,
+        agentAnalyses || [],
+        relevantKnowledge || []
+      )
+      
+      // Step 7: Store final result
+      const processingTime = Date.now() - startTime
+      const result: AnalysisResult = {
+        analysisId,
+        documentName: file.name,
+        reviewMode,
+        summary,
+        status: 'completed',
+        ...finalAnalysis,
+        timestamp: new Date().toISOString(),
+        processingTimeMs: processingTime
+      }
+      
+      await AnalysisStorage.storeAnalysis(analysisId, result)
+      console.log(`Analysis completed for ${file.name} in ${processingTime}ms`)
+      
+    } catch (error) {
+      console.error(`Error processing document ${file.name}:`, error)
+      
+      // Store error result
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      console.error(`Updating analysis status to failed with error: ${errorMsg}`)
+      
+      try {
+        await AnalysisStorage.updateAnalysisStatus(
+          analysisId,
+          'failed',
+          errorMsg
+        )
+      } catch (storageError) {
+        console.error('Failed to update analysis status:', storageError)
+      }
+      
+      throw error // Re-throw to be caught by the route handler
     }
+  }
     
     await AnalysisStorage.storeAnalysis(analysisId, result)
     console.log(`Analysis completed for ${file.name} in ${processingTime}ms`)
