@@ -1,3 +1,7 @@
+console.log('🔍 WEAVIATE_URL:', process.env.WEAVIATE_URL);
+console.log('🔍 WEAVIATE_API_KEY set:', !!process.env.WEAVIATE_API_KEY);
+console.log('🔍 OPENAI_API_KEY set:', !!process.env.OPENAI_API_KEY);
+
 import weaviate, { WeaviateClient, ApiKey } from 'weaviate-ts-client'
 import { DocumentChunk } from './real-document-processor'
 
