@@ -1,5 +1,5 @@
 import { RealDocumentProcessor, ProcessedDocument } from './real-document-processor'
-import { initializeWeaviateSchema, storePhysicsChunk, searchPhysicsKnowledge, PhysicsChunk } from './real-weaviate'
+import { initializeWeaviateSchema, storePhysicsChunk, searchPhysicsKnowledge, PhysicsChunk } from './weaviate'
 import { AnalysisStorage, AnalysisResult } from './kv-storage'
 import { v4 as uuidv4 } from 'uuid'
 
