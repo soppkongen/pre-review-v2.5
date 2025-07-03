@@ -93,134 +93,20 @@ export default function ResultsPage() {
       if (!response.ok) {
         throw new Error('Failed to fetch results')
       }
-      const data = await response.json()
-      
-      // For now, create mock data since the API doesn't return full results yet
-      const mockResults: AnalysisResult = {
-        analysisId: id,
-        documentName: "Quantum_Entanglement_Research.pdf",
-        analysisType: "Full Review",
-        timestamp: new Date().toISOString(),
-        overallScore: 8.2,
-        confidence: 0.87,
-        summary: "This paper presents a novel approach to quantum entanglement measurement with significant theoretical contributions. The methodology is sound, though some experimental validation could be strengthened.",
-        keyFindings: [
-          "Novel quantum measurement protocol shows 15% improvement in entanglement detection",
-          "Theoretical framework aligns well with existing quantum mechanics principles",
-          "Statistical analysis demonstrates significant results (p < 0.001)",
-          "Experimental setup is reproducible with standard laboratory equipment"
-        ],
-        strengths: [
-          "Clear theoretical foundation and mathematical rigor",
-          "Comprehensive literature review covering recent developments",
-          "Well-designed experimental methodology",
-          "Statistical analysis is appropriate and thorough"
-        ],
-        weaknesses: [
-          "Limited sample size in experimental validation",
-          "Some assumptions about quantum decoherence need further justification",
-          "Discussion of potential applications could be expanded"
-        ],
-        recommendations: [
-          "Increase sample size for experimental validation",
-          "Provide additional theoretical justification for decoherence assumptions",
-          "Expand discussion of practical applications and implications",
-          "Consider peer review from quantum optics specialists"
-        ],
-        agentResults: [
-          {
-            agentName: "Theoretical Physicist",
-            role: "Theory development and validation",
-            confidence: 0.92,
-            findings: [
-              "Mathematical framework is consistent with quantum mechanics",
-              "Novel approach to entanglement measurement is theoretically sound",
-              "Assumptions about quantum systems are generally valid"
-            ],
-            recommendations: [
-              "Strengthen theoretical justification for decoherence model",
-              "Consider alternative theoretical frameworks for comparison"
-            ]
-          },
-          {
-            agentName: "Mathematical Analyst",
-            role: "Equations and mathematical rigor",
-            confidence: 0.85,
-            findings: [
-              "Mathematical derivations are correct and well-presented",
-              "Statistical analysis follows appropriate methodologies",
-              "Error propagation is handled correctly"
-            ],
-            recommendations: [
-              "Include sensitivity analysis for key parameters",
-              "Provide more detailed mathematical appendix"
-            ]
-          },
-          {
-            agentName: "Experimental Designer",
-            role: "Testable predictions and validation",
-            confidence: 0.83,
-            findings: [
-              "Experimental design is appropriate for testing hypotheses",
-              "Control conditions are well-defined",
-              "Measurement protocols are clearly described"
-            ],
-            recommendations: [
-              "Increase sample size for stronger statistical power",
-              "Include additional control experiments"
-            ]
-          }
-        ],
-        detailedAnalysis: {
-          epistemicEvaluation: {
-            score: 8.5,
-            details: "The paper demonstrates strong epistemic foundations with clear reasoning and evidence-based conclusions.",
-            issues: [
-              "Some assumptions could benefit from additional empirical support",
-              "Alternative interpretations not fully explored"
-            ]
-          },
-          methodologyAssessment: {
-            score: 8.0,
-            details: "Methodology is sound and appropriate for the research questions posed.",
-            strengths: [
-              "Clear experimental protocol",
-              "Appropriate statistical methods",
-              "Good control of variables"
-            ],
-            concerns: [
-              "Limited sample size",
-              "Potential selection bias in data collection"
-            ]
-          },
-          paradigmIndependence: {
-            score: 7.8,
-            details: "Analysis shows good independence from dominant paradigms with some areas for improvement.",
-            biases: [
-              "Slight bias toward Copenhagen interpretation",
-              "Limited consideration of alternative quantum theories"
-            ]
-          },
-          reproducibility: {
-            score: 8.3,
-            details: "High reproducibility potential with clear methodology and data availability.",
-            factors: [
-              "Detailed experimental protocols provided",
-              "Code and data availability mentioned",
-              "Standard equipment requirements"
-            ]
-          }
-        }
-      }
-      
-      setResults(mockResults)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
+      const fetchResults = async (id: string) => {
+  try {
+    const response = await fetch(`/api/analysis?analysisId=${id}`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch results')
     }
+    const data = await response.json()
+    setResults(data)
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Unknown error')
+  } finally {
+    setLoading(false)
   }
-
+}
   const getScoreColor = (score: number) => {
     if (score >= 8) return "text-green-600"
     if (score >= 6) return "text-yellow-600"
