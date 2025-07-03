@@ -1,4 +1,3 @@
-// next.config.mjs
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -9,7 +8,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
- const nextConfig = {
   env: {
     WEAVIATE_URL: process.env.WEAVIATE_URL ?? 'MISSING',
     WEAVIATE_API_KEY: process.env.WEAVIATE_API_KEY ?? 'MISSING',
