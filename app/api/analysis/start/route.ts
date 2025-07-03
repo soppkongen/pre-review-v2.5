@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { RealAnalysisOrchestrator } from '@/lib/real-analysis-orchestrator'
-import { getAnalysisResult } from '@/lib/kv-storage'
+import { AnalysisStorage } from '@/lib/kv-storage'
 
-// Add export configuration for the route
 export const config = {
   api: {
-    bodyParser: false // Disable the default body parser
+    bodyParser: false
   }
-}
-
-export async function GET(request: NextRequest) {
-  // ... GET handler stays the same ...
 }
 
 export async function POST(request: NextRequest) {
@@ -45,6 +40,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Test Redis connection before proceeding
+    try {
+      await AnalysisStorage.ping()
+    } catch (error) {
+      console.error('Redis connection test failed:', error)
+      return NextResponse.json(
+        { error: 'Storage system unavailable' },
+        { status: 503 }
+      )
+    }
+
     // Validate file type
     const allowedTypes = [
       'application/pdf',
@@ -76,11 +82,21 @@ export async function POST(request: NextRequest) {
     console.log('[DEBUG] Analysis started with ID:', analysisId)
     
     return NextResponse.json({ analysisId })
+
   } catch (error) {
     console.error('[DEBUG] Error processing analysis:', error)
+    // Ensure we always return a response
     return NextResponse.json(
-      { error: 'Analysis failed', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Analysis failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }
+}
+
+export async function GET(request: NextRequest) {
+  // Always return a response
+  return NextResponse.json({ status: 'ok' })
 }
