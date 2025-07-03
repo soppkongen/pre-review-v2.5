@@ -52,13 +52,15 @@ export class AnalysisStorage {
       return result === 'PONG'
     } catch (error) {
       console.error('Storage ping failed:', error)
-      throw error // Let the caller handle the error
+      throw error
     }
   }
 
   static async storeAnalysis(analysisId: string, result: AnalysisResult): Promise<void> {
     try {
-      await redis.set(`analysis:${analysisId}`, JSON.stringify(result))
+      // Check if result is already a string
+      const resultString = typeof result === 'string' ? result : JSON.stringify(result)
+      await redis.set(`analysis:${analysisId}`, resultString)
       // Set expiration to 30 days
       await redis.expire(`analysis:${analysisId}`, 30 * 24 * 60 * 60)
     } catch (error) {
@@ -71,10 +73,16 @@ export class AnalysisStorage {
     try {
       const result = await redis.get(`analysis:${analysisId}`)
       if (!result) return null
-      return JSON.parse(result as string) as AnalysisResult
+      
+      // Handle both string and object responses from Redis
+      if (typeof result === 'object') {
+        return result as AnalysisResult
+      }
+      
+      return JSON.parse(result) as AnalysisResult
     } catch (error) {
       console.error('Error retrieving analysis:', error)
-      throw error // Let the caller handle the error
+      throw error
     }
   }
 
@@ -86,14 +94,25 @@ export class AnalysisStorage {
     try {
       const existingResult = await this.getAnalysis(analysisId)
       if (!existingResult) {
-        throw new Error(`Analysis ${analysisId} not found`)
+        // If no existing result, create a new one
+        const newResult: AnalysisResult = {
+          analysisId,
+          documentName: 'Unknown',  // We don't have this info at this point
+          reviewMode: 'standard',   // Default value
+          status,
+          timestamp: new Date().toISOString()
+        }
+        if (error) newResult.error = error
+        await this.storeAnalysis(analysisId, newResult)
+        return
       }
+
       existingResult.status = status
       if (error) existingResult.error = error
       await this.storeAnalysis(analysisId, existingResult)
     } catch (error) {
       console.error('Error updating analysis status:', error)
-      throw error // Let the caller handle the error
+      throw error
     }
   }
 }
