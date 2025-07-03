@@ -1,3 +1,5 @@
+console.log('ENV:', process.env);
+
 import { type NextRequest, NextResponse } from "next/server"
 import { DocumentProcessor } from "@/lib/services/document-processor"
 import { getWeaviateClient } from "@/lib/weaviate"
