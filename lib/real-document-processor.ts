@@ -386,4 +386,70 @@ export class RealDocumentProcessor {
     let bestDomain = 'general'
 
     for (const [domain, keywords] of Object.entries(PHYSICS_DOMAINS)) {
+      const score = keywords.reduce((acc, keyword) => {
+        const regex = new RegExp(keyword, 'gi')
+        const matches = lowerContent.match(regex)
+        return acc + (matches ? matches.length : 0)
+      }, 0)
+
+      if (score > maxScore) {
+        maxScore = score
+        bestDomain = domain
+      }
+    }
+
+    return bestDomain
+  }
+
+  private static extractPhysicsConcepts(content: string): string[] {
+    const concepts: string[] = []
+    const lowerContent = content.toLowerCase()
+    
+    Object.values(PHYSICS_DOMAINS).flat().forEach(keyword => {
+      if (lowerContent.includes(keyword)) {
+        concepts.push(keyword)
+      }
+    })
+    
+    return [...new Set(concepts)]
+  }
+
+  private static extractMathematicalContent(content: string): string[] {
+    const equations: string[] = []
+    
+    MATH_PATTERNS.forEach(pattern => {
+      const matches = content.match(pattern)
+      if (matches) {
+        equations.push(...matches)
+      }
+    })
+    
+    return [...new Set(equations)]
+  }
+
+  private static assessDifficultyLevel(content: string): string {
+    const lowerContent = content.toLowerCase()
+    
+    const advancedTerms = [
+      'tensor', 'manifold', 'gauge', 'symmetry', 'renormalization', 'topology',
+      'group theory', 'lie algebra', 'differential geometry', 'field theory'
+    ]
+    
+    const intermediateTerms = [
+      'derivative', 'integral', 'matrix', 'vector', 'differential', 'eigenvalue',
+      'fourier', 'laplacian', 'gradient', 'divergence'
+    ]
+    
+    const advancedCount = advancedTerms.reduce((acc, term) => 
+      acc + (lowerContent.includes(term) ? 1 : 0), 0)
+    const intermediateCount = intermediateTerms.reduce((acc, term) => 
+      acc + (lowerContent.includes(term) ? 1 : 0), 0)
+    
+    if (advancedCount > 2) return 'advanced'
+    if (intermediateCount > 2 || advancedCount > 0) return 'intermediate'
+    return 'beginner'
+  }
+}
       
+
+    
