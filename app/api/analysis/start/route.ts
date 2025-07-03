@@ -73,10 +73,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Process the file and start analysis
-   const analysisId = await RealAnalysisOrchestrator.analyzeDocument(file, summary, reviewMode)
-return NextResponse.json({ analysisId })
-    
-    return NextResponse.json(result)
+    const analysisId = await RealAnalysisOrchestrator.analyzeDocument(file, summary, reviewMode)
+    return NextResponse.json({ analysisId })
   } catch (error) {
     console.error('Error processing analysis:', error)
     return NextResponse.json(
