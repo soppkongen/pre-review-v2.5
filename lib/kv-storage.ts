@@ -1,10 +1,40 @@
 import { Redis } from '@upstash/redis'
 
 // Initialize Redis client with Upstash credentials
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-})
+let redis: Redis;
+
+try {
+  // Try multiple possible environment variable combinations
+  const url = process.env.KV_URL || process.env.KV_REST_API_URL || process.env.REDIS_URL
+  const token = process.env.KV_REST_API_TOKEN || process.env.KV_REST_API_READ_ONLY_TOKEN
+
+  if (!url || !token) {
+    throw new Error('Missing required Redis credentials. Please check environment variables.')
+  }
+  
+  redis = new Redis({
+    url,
+    token,
+  })
+
+  // Test the connection
+  redis.ping().then(() => {
+    console.log('Successfully connected to Redis')
+  }).catch((error) => {
+    console.error('Failed to ping Redis:', error)
+  })
+
+} catch (error) {
+  console.error('Failed to initialize Redis client:', error)
+  // Create a mock Redis client for development
+  redis = {
+    set: async () => true,
+    get: async () => null,
+    expire: async () => true,
+    keys: async () => [],
+    ping: async () => "PONG",
+  } as any
+}
 
 export interface AnalysisResult {
   analysisId: string
@@ -39,6 +69,17 @@ export interface AnalysisResult {
 }
 
 export class AnalysisStorage {
+  // Test Redis connection
+  static async ping(): Promise<boolean> {
+    try {
+      const result = await redis.ping()
+      return result === 'PONG'
+    } catch (error) {
+      console.error('Redis ping failed:', error)
+      throw error
+    }
+  }
+
   // Store analysis result
   static async storeAnalysis(analysisId: string, result: AnalysisResult): Promise<void> {
     try {
@@ -71,15 +112,24 @@ export class AnalysisStorage {
   ): Promise<void> {
     try {
       const existing = await this.getAnalysis(analysisId)
-      if (!existing) throw new Error('Analysis not found')
       
-      existing.status = status
-      if (error) existing.error = error
+      // If analysis doesn't exist, create a new one
+      const analysis: AnalysisResult = existing || {
+        analysisId,
+        documentName: 'Unknown',
+        reviewMode: 'full',
+        status: 'processing',
+        timestamp: new Date().toISOString()
+      }
       
-      await this.storeAnalysis(analysisId, existing)
+      analysis.status = status
+      if (error) analysis.error = error
+      
+      await this.storeAnalysis(analysisId, analysis)
     } catch (error) {
       console.error('Error updating analysis status:', error)
-      throw new Error('Failed to update analysis status')
+      // Don't throw here, just log the error
+      console.warn(`Failed to update analysis status for ID ${analysisId} to ${status}`)
     }
   }
 
@@ -118,8 +168,8 @@ export class AnalysisStorage {
     }
   }
 }
+
 // Wrapper function for API routes to get analysis results
 export async function getAnalysisResult(analysisId: string): Promise<AnalysisResult | null> {
   return await AnalysisStorage.getAnalysis(analysisId)
 }
-
