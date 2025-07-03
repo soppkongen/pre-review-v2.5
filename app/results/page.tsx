@@ -93,20 +93,15 @@ export default function ResultsPage() {
       if (!response.ok) {
         throw new Error('Failed to fetch results')
       }
-      const fetchResults = async (id: string) => {
-  try {
-    const response = await fetch(`/api/analysis?analysisId=${id}`)
-    if (!response.ok) {
-      throw new Error('Failed to fetch results')
+      const data = await response.json()
+      setResults(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setLoading(false)
     }
-    const data = await response.json()
-    setResults(data)
-  } catch (err) {
-    setError(err instanceof Error ? err.message : 'Unknown error')
-  } finally {
-    setLoading(false)
   }
-}
+
   const getScoreColor = (score: number) => {
     if (score >= 8) return "text-green-600"
     if (score >= 6) return "text-yellow-600"
@@ -446,4 +441,3 @@ export default function ResultsPage() {
     </div>
   )
 }
-
