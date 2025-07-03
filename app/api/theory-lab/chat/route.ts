@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initializeWeaviateSchema, searchPhysicsKnowledge } from '@/lib/real-weaviate'
+import { initializeWeaviateSchema, searchPhysicsKnowledge } from '@/lib/weaviate'
 import { RealOpenAIAgents } from '@/lib/real-openai-agents'
 import { v4 as uuidv4 } from 'uuid'
 
