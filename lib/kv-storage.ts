@@ -118,4 +118,8 @@ export class AnalysisStorage {
     }
   }
 }
+// Wrapper function for API routes to get analysis results
+export async function getAnalysisResult(analysisId: string): Promise<AnalysisResult | null> {
+  return await AnalysisStorage.getAnalysis(analysisId)
+}
 
