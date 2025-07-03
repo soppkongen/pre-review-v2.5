@@ -2,26 +2,27 @@ console.log('🔍 WEAVIATE_URL:', process.env.WEAVIATE_URL);
 console.log('🔍 WEAVIATE_API_KEY set:', !!process.env.WEAVIATE_API_KEY);
 console.log('🔍 OPENAI_API_KEY set:', !!process.env.OPENAI_API_KEY);
 
-import weaviate, { WeaviateClient, ApiKey } from 'weaviate-ts-client'
-import { DocumentChunk } from './real-document-processor'
+- import weaviate, { WeaviateClient, ApiKey } from 'weaviate-ts-client'
++ import { initializeWeaviateClient } from '@/lib/weaviate'
 
-// Weaviate client instance
-let client: WeaviateClient | null = null
+- let client: WeaviateClient | null = null
++ // No client variable needed here
 
-// Initialize Weaviate client
-export function initializeWeaviateClient(): WeaviateClient {
-  if (!client) {
-    client = weaviate.client({
-      scheme: 'https',
-      host: process.env.WEAVIATE_URL!.replace('https://', ''),
-      apiKey: new ApiKey(process.env.WEAVIATE_API_KEY!),
-      headers: {
-        'X-OpenAI-Api-Key': process.env.OPENAI_API_KEY!,
-      },
-    })
-  }
-  return client
-}
+- export function initializeWeaviateClient(): WeaviateClient {
+-   if (!client) {
+-     client = weaviate.client({
+-       scheme: 'https',
+-       host: process.env.WEAVIATE_URL!.replace('https://', ''),
+-       apiKey: new ApiKey(process.env.WEAVIATE_API_KEY!),
+-       headers: {
+-         'X-OpenAI-Api-Key': process.env.OPENAI_API_KEY!,
+-       },
+-     })
+-   }
+-   return client
+- }
++ // Use the shared initializer
++ const client = initializeWeaviateClient()
 
 // Physics knowledge chunk interface for Weaviate
 export interface PhysicsChunk {
