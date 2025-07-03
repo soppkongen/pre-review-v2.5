@@ -1,3 +1,4 @@
+import { Redis } from '@upstash/redis'
 import { NextRequest, NextResponse } from 'next/server'
 import { RealAnalysisOrchestrator } from '@/lib/real-analysis-orchestrator'
 import { getAnalysisResult } from '@/lib/kv-storage'
@@ -13,10 +14,43 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       )
     }
+ // Add KV connection check
+    const redis = new Redis({
+      url: process.env.KV_REST_API_URL!,
+      token: process.env.KV_REST_API_TOKEN!,
+    })
+    
+    console.log('[DEBUG] KV connection:', {
+      hasUrl: !!process.env.KV_REST_API_URL,
+      hasToken: !!process.env.KV_REST_API_TOKEN
+    })
 
     // Retrieve analysis results from KV storage
+    console.log('[DEBUG] Attempting to fetch analysis result...')
     const result = await getAnalysisResult(analysisId)
     
+    console.log('[DEBUG] Analysis result:', {
+      found: !!result,
+      status: result?.status,
+      analysisId: result?.analysisId
+    })
+    
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Analysis not found or expired' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('[DEBUG] Error in analysis fetch:', error)
+    return NextResponse.json(
+      { error: 'Failed to retrieve analysis' },
+      { status: 500 }
+    )
+  }
+}
     if (!result) {
       return NextResponse.json(
         { error: 'Analysis not found or expired' },
