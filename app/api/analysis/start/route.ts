@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Process the file and start analysis
-    const orchestrator = new RealAnalysisOrchestrator()
-    const result = await orchestrator.startAnalysis(file, summary, reviewMode)
+   const analysisId = await RealAnalysisOrchestrator.analyzeDocument(file, summary, reviewMode)
+return NextResponse.json({ analysisId })
     
     return NextResponse.json(result)
   } catch (error) {
