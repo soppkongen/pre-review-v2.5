@@ -34,6 +34,54 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Keep your existing POST function below
 export async function POST(request: NextRequest) {
-  // Your existing code...
+  try {
+    const formData = await request.formData()
+    const file = formData.get('file') as File
+    const summary = formData.get('summary') as string
+    const reviewMode = formData.get('reviewMode') as string
+    
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      )
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'
+    ]
+    
+    const isValidType = allowedTypes.includes(file.type) || file.name.endsWith('.tex')
+    
+    if (!isValidType) {
+      return NextResponse.json(
+        { error: 'Unsupported file type. Please upload PDF, DOCX, TXT, or LaTeX files.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 10MB.' },
+        { status: 400 }
+      )
+    }
+
+    // Process the file and start analysis
+    const orchestrator = new RealAnalysisOrchestrator()
+    const result = await orchestrator.startAnalysis(file, summary, reviewMode)
+    
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('Error processing analysis:', error)
+    return NextResponse.json(
+      { error: 'Analysis failed' },
+      { status: 500 }
+    )
+  }
+}
