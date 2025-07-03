@@ -2,81 +2,103 @@ import Link from "next/link"
 
 export function Footer() {
   return (
-    <footer className="bg-gray-50 border-t">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <footer className="bg-white border-t border-gray-200">
+      <div className="max-w-6xl mx-auto px-4 py-12">
         <div className="grid md:grid-cols-4 gap-8">
+          {/* Brand */}
           <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Pre-Review</h3>
+            <div className="flex items-center space-x-2 mb-4">
+              <img src="/logo.webp" alt="Pre-Review" className="h-8 w-8" />
+              <span className="font-semibold text-gray-900">Pre-Review</span>
+            </div>
             <p className="text-sm text-gray-600">
               Epistemic counterintelligence for research papers. Fair, transparent, post-paradigm peer review.
             </p>
           </div>
 
+          {/* Platform */}
           <div>
-            <h4 className="font-medium text-gray-900 mb-4">Platform</h4>
-            <ul className="space-y-2 text-sm text-gray-600">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Platform</h3>
+            <ul className="space-y-2">
               <li>
-                <Link href="/how-it-works" className="hover:text-gray-900">
-                  How It Works
-                </Link>
-              </li>
-              <li>
-                <Link href="/faq" className="hover:text-gray-900">
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="hover:text-gray-900">
+                <Link href="/about" className="text-sm text-gray-600 hover:text-teal-600 transition-colors">
                   About
+                </Link>
+              </li>
+              <li>
+                <Link href="/submit" className="text-sm text-gray-600 hover:text-teal-600 transition-colors">
+                  Review Paper
+                </Link>
+              </li>
+              <li>
+                <Link href="/theory-lab" className="text-sm text-gray-600 hover:text-teal-600 transition-colors">
+                  Theory Lab
                 </Link>
               </li>
             </ul>
           </div>
 
+          {/* Support */}
           <div>
-            <h4 className="font-medium text-gray-900 mb-4">Support</h4>
-            <ul className="space-y-2 text-sm text-gray-600">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Support</h3>
+            <ul className="space-y-2">
               <li>
-                <Link href="/contact" className="hover:text-gray-900">
+                <Link href="/contact" className="text-sm text-gray-600 hover:text-teal-600 transition-colors">
                   Contact
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="hover:text-gray-900">
+                <Link href="/privacy" className="text-sm text-gray-600 hover:text-teal-600 transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="hover:text-gray-900">
+                <Link href="/terms" className="text-sm text-gray-600 hover:text-teal-600 transition-colors">
                   Terms of Service
                 </Link>
               </li>
             </ul>
           </div>
 
+          {/* Related Tools */}
           <div>
-            <h4 className="font-medium text-gray-900 mb-4">Related Tools</h4>
-            <ul className="space-y-2 text-sm text-gray-600">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Related Tools</h3>
+            <ul className="space-y-2">
               <li>
-                <Link href="#" className="hover:text-gray-900">
-                  People's Intelligence Project
-                </Link>
+                <a 
+                  href="https://www.t-pip.no/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-600 hover:text-teal-600 transition-colors"
+                >
+                  The People's Intelligence Project
+                </a>
               </li>
               <li>
-                <Link href="#" className="hover:text-gray-900">
+                <a 
+                  href="https://wordsmimir.t-pip.no/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-600 hover:text-teal-600 transition-colors"
+                >
                   Words Mimir
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="#" className="hover:text-gray-900">
+                <a 
+                  href="https://realitychecker.t-pip.no/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-gray-600 hover:text-teal-600 transition-colors"
+                >
                   Reality Checker
-                </Link>
+                </a>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="border-t mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
+        <div className="border-t border-gray-200 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-gray-600">© 2025 People's Intelligence Project. All rights reserved.</p>
           <p className="text-sm text-gray-600 mt-2 md:mt-0">Built with epistemic integrity in mind.</p>
         </div>
@@ -84,3 +106,4 @@ export function Footer() {
     </footer>
   )
 }
+

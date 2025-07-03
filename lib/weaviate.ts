@@ -4,15 +4,17 @@ let client: WeaviateClient | null = null
 
 export function getWeaviateClient(): WeaviateClient {
   if (!client) {
-    if (!process.env.WEAVIATE_API_KEY || !process.env.REST_ENDPOINT_URL) {
+    if (!process.env.WEAVIATE_API_KEY || !process.env.WEAVIATE_URL) {
       throw new Error(
-        "Weaviate configuration missing. Please set WEAVIATE_API_KEY and REST_ENDPOINT_URL environment variables.",
+        "Weaviate configuration missing. Please set WEAVIATE_API_KEY and WEAVIATE_URL environment variables.",
       )
     }
 
+    const url = new URL(process.env.WEAVIATE_URL)
+    
     client = weaviate.client({
-      scheme: "https",
-      host: process.env.REST_ENDPOINT_URL.replace("https://", ""),
+      scheme: url.protocol.replace(':', ''),
+      host: url.host,
       apiKey: new ApiKey(process.env.WEAVIATE_API_KEY),
       headers: { "X-OpenAI-Api-Key": process.env.OPENAI_API_KEY || "" },
     })
@@ -20,16 +22,33 @@ export function getWeaviateClient(): WeaviateClient {
   return client
 }
 
-export interface PhysicsKnowledge {
+export interface PhysicsChunk {
   id?: string
-  concept: string
-  description: string
-  field: string
-  difficulty: string
+  chunkId: string
+  sourceDocument: string
+  content: string
+  domain: string
+  subdomain: string
+  contentType: string
+  difficultyLevel: string
+  priority: number
+  hasMathematicalContent: boolean
   equations?: string[]
-  applications?: string[]
-  relatedConcepts?: string[]
-  examples?: string[]
+  concepts?: string[]
+  prerequisites?: string[]
+  chapter?: string
+  section?: string
+  pageRange?: string
+  extractionMethod: string
+}
+
+export interface ChunkRelationship {
+  id?: string
+  fromChunkId: string
+  toChunkId: string
+  relationshipType: string
+  strength: number
+  description: string
 }
 
 export interface ResearchPaper {
@@ -62,61 +81,178 @@ export async function initializeWeaviateSchema() {
     const schema = await client.schema.getter().do()
     const existingClasses = schema.classes?.map((c) => c.class) || []
 
-    // Create PhysicsKnowledge class if it doesn't exist
-    if (!existingClasses.includes("PhysicsKnowledge")) {
+    // Create PhysicsChunk class if it doesn't exist
+    if (!existingClasses.includes("PhysicsChunk")) {
       await client.schema
         .classCreator()
         .withClass({
-          class: "PhysicsKnowledge",
-          description: "Physics concepts and knowledge base",
+          class: "PhysicsChunk",
+          description: "A chunk of physics knowledge with rich metadata",
           vectorizer: "text2vec-openai",
           moduleConfig: {
             "text2vec-openai": {
-              model: "ada",
-              modelVersion: "002",
-              type: "text",
+              model: "text-embedding-3-small",
+              vectorizeClassName: true,
             },
           },
           properties: [
             {
-              name: "concept",
+              name: "chunkId",
               dataType: ["text"],
-              description: "The physics concept name",
+              description: "Unique identifier for the chunk",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
-              name: "description",
+              name: "sourceDocument",
               dataType: ["text"],
-              description: "Detailed description of the concept",
+              description: "Original source document filename",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
-              name: "field",
+              name: "content",
               dataType: ["text"],
-              description: "Physics field (e.g., quantum mechanics, thermodynamics)",
+              description: "The actual text content",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
-              name: "difficulty",
+              name: "domain",
               dataType: ["text"],
-              description: "Difficulty level (beginner, intermediate, advanced)",
+              description: "Primary physics domain",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "subdomain",
+              dataType: ["text"],
+              description: "Physics subdomain",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "contentType",
+              dataType: ["text"],
+              description: "Type of content",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "difficultyLevel",
+              dataType: ["text"],
+              description: "Difficulty level",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "priority",
+              dataType: ["int"],
+              description: "Content priority ranking",
+              indexFilterable: true,
+            },
+            {
+              name: "hasMathematicalContent",
+              dataType: ["boolean"],
+              description: "Contains mathematical equations",
+              indexFilterable: true,
             },
             {
               name: "equations",
               dataType: ["text[]"],
-              description: "Related equations",
+              description: "Mathematical equations",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
-              name: "applications",
+              name: "concepts",
               dataType: ["text[]"],
-              description: "Real-world applications",
+              description: "Physics concepts covered",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
-              name: "relatedConcepts",
+              name: "prerequisites",
               dataType: ["text[]"],
-              description: "Related physics concepts",
+              description: "Required prerequisite knowledge",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
-              name: "examples",
-              dataType: ["text[]"],
-              description: "Examples and use cases",
+              name: "chapter",
+              dataType: ["text"],
+              description: "Chapter information",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "section",
+              dataType: ["text"],
+              description: "Section information",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "pageRange",
+              dataType: ["text"],
+              description: "Page range in source",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "extractionMethod",
+              dataType: ["text"],
+              description: "Content extraction method",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+          ],
+        })
+        .do()
+    }
+
+    // Create ChunkRelationship class if it doesn't exist
+    if (!existingClasses.includes("ChunkRelationship")) {
+      await client.schema
+        .classCreator()
+        .withClass({
+          class: "ChunkRelationship",
+          description: "Relationships between physics chunks",
+          vectorizer: "none",
+          properties: [
+            {
+              name: "fromChunkId",
+              dataType: ["text"],
+              description: "Source chunk ID",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "toChunkId",
+              dataType: ["text"],
+              description: "Target chunk ID",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "relationshipType",
+              dataType: ["text"],
+              description: "Type of relationship",
+              indexFilterable: true,
+              indexSearchable: true,
+            },
+            {
+              name: "strength",
+              dataType: ["number"],
+              description: "Relationship strength",
+              indexFilterable: true,
+            },
+            {
+              name: "description",
+              dataType: ["text"],
+              description: "Relationship description",
+              indexFilterable: true,
+              indexSearchable: true,
             },
           ],
         })
@@ -133,9 +269,8 @@ export async function initializeWeaviateSchema() {
           vectorizer: "text2vec-openai",
           moduleConfig: {
             "text2vec-openai": {
-              model: "ada",
-              modelVersion: "002",
-              type: "text",
+              model: "text-embedding-3-small",
+              vectorizeClassName: true,
             },
           },
           properties: [
@@ -143,41 +278,55 @@ export async function initializeWeaviateSchema() {
               name: "title",
               dataType: ["text"],
               description: "Paper title",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "authors",
               dataType: ["text[]"],
               description: "Paper authors",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "abstract",
               dataType: ["text"],
               description: "Paper abstract",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "content",
               dataType: ["text"],
               description: "Full paper content",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "field",
               dataType: ["text"],
               description: "Research field",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "keywords",
               dataType: ["text[]"],
               description: "Paper keywords",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "uploadDate",
               dataType: ["text"],
               description: "Upload timestamp",
+              indexFilterable: true,
             },
             {
               name: "fileType",
               dataType: ["text"],
               description: "File type (pdf, txt, etc.)",
+              indexFilterable: true,
             },
           ],
         })
@@ -194,9 +343,8 @@ export async function initializeWeaviateSchema() {
           vectorizer: "text2vec-openai",
           moduleConfig: {
             "text2vec-openai": {
-              model: "ada",
-              modelVersion: "002",
-              type: "text",
+              model: "text-embedding-3-small",
+              vectorizeClassName: true,
             },
           },
           properties: [
@@ -204,31 +352,41 @@ export async function initializeWeaviateSchema() {
               name: "paperId",
               dataType: ["text"],
               description: "Reference to analyzed paper",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "analysisType",
               dataType: ["text"],
               description: "Type of analysis performed",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "result",
               dataType: ["text"],
               description: "Analysis result content",
+              indexFilterable: true,
+              indexSearchable: true,
             },
             {
               name: "confidence",
               dataType: ["number"],
               description: "Confidence score (0-1)",
+              indexFilterable: true,
             },
             {
               name: "timestamp",
               dataType: ["text"],
               description: "Analysis timestamp",
+              indexFilterable: true,
             },
             {
               name: "agentId",
               dataType: ["text"],
               description: "ID of the agent that performed analysis",
+              indexFilterable: true,
+              indexSearchable: true,
             },
           ],
         })
@@ -242,3 +400,78 @@ export async function initializeWeaviateSchema() {
     throw error
   }
 }
+
+// Query functions for physics knowledge
+export async function searchPhysicsKnowledge(query: string, limit: number = 10) {
+  const client = getWeaviateClient()
+  
+  try {
+    const result = await client.graphql
+      .get()
+      .withClassName("PhysicsChunk")
+      .withFields("chunkId content domain subdomain concepts equations difficultyLevel")
+      .withNearText({ concepts: [query] })
+      .withLimit(limit)
+      .do()
+    
+    return result.data.Get.PhysicsChunk || []
+  } catch (error) {
+    console.error("Error searching physics knowledge:", error)
+    throw error
+  }
+}
+
+// Store physics chunk
+export async function storePhysicsChunk(chunk: PhysicsChunk) {
+  const client = getWeaviateClient()
+  
+  try {
+    const result = await client.data
+      .creator()
+      .withClassName("PhysicsChunk")
+      .withProperties(chunk)
+      .do()
+    
+    return result
+  } catch (error) {
+    console.error("Error storing physics chunk:", error)
+    throw error
+  }
+}
+
+// Store research paper
+export async function storeResearchPaper(paper: ResearchPaper) {
+  const client = getWeaviateClient()
+  
+  try {
+    const result = await client.data
+      .creator()
+      .withClassName("ResearchPaper")
+      .withProperties(paper)
+      .do()
+    
+    return result
+  } catch (error) {
+    console.error("Error storing research paper:", error)
+    throw error
+  }
+}
+
+// Store analysis result
+export async function storeAnalysisResult(analysis: AnalysisResult) {
+  const client = getWeaviateClient()
+  
+  try {
+    const result = await client.data
+      .creator()
+      .withClassName("AnalysisResult")
+      .withProperties(analysis)
+      .do()
+    
+    return result
+  } catch (error) {
+    console.error("Error storing analysis result:", error)
+    throw error
+  }
+}
+

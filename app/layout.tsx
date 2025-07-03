@@ -10,7 +10,12 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Pre-Review - Epistemic Counterintelligence for Research Papers",
   description: "Revolutionary multi-agent system for comprehensive epistemic analysis of research papers",
-    generator: 'v0.dev'
+  generator: 'v0.dev',
+  icons: {
+    icon: '/favicon.webp',
+    shortcut: '/favicon.webp',
+    apple: '/favicon.webp',
+  },
 }
 
 export default function RootLayout({

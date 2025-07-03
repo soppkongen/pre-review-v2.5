@@ -1,20 +1,23 @@
-"use client"
+'use client'
 
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { Upload, FileText, Info } from "lucide-react"
+import { Upload, FileText, Info, Loader2 } from "lucide-react"
 
 export default function SubmitPage() {
+  const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
   const [summary, setSummary] = useState("")
   const [reviewMode, setReviewMode] = useState("full")
   const [dragActive, setDragActive] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -39,6 +42,39 @@ export default function SubmitPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0])
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!file) return
+
+    setIsSubmitting(true)
+    
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('summary', summary)
+      formData.append('reviewMode', reviewMode)
+
+      const response = await fetch('/api/analysis/start', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Analysis failed')
+      }
+
+      const result = await response.json()
+      
+      // Redirect to results page with analysis ID
+      router.push(`/results?id=${result.analysisId}`)
+      
+    } catch (error) {
+      console.error('Submission error:', error)
+      alert('Failed to submit analysis. Please try again.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -163,8 +199,19 @@ export default function SubmitPage() {
           <Button variant="outline" className="flex-1 bg-transparent">
             Cancel
           </Button>
-          <Button className="flex-1 bg-teal-600 hover:bg-teal-700" disabled={!file}>
-            Start Review
+          <Button 
+            className="flex-1 bg-teal-600 hover:bg-teal-700" 
+            disabled={!file || isSubmitting}
+            onClick={handleSubmit}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              'Start Review'
+            )}
           </Button>
         </div>
       </div>
