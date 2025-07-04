@@ -65,28 +65,22 @@ export class DocumentProcessor {
     this.chunkingOptions = { ...DEFAULT_CHUNKING_OPTIONS, ...options }
   }
 
-  // Main processing function
-  async processDocument(filePath: string, filename: string): Promise<ProcessedDocument> {
-    const fileExtension = path.extname(filename).toLowerCase()
-    let content: string
+  // Main processing function for uploaded files
+  async processDocument(file: File): Promise<ProcessedDocument> {
+    let content: string = ''
     let metadata: DocumentMetadata
+    const filename = file.name
+    const fileType = file.type
 
     // Extract content based on file type
-    switch (fileExtension) {
-      case '.pdf':
-        ({ content, metadata } = await this.processPDF(filePath))
-        break
-      case '.txt':
-        ({ content, metadata } = await this.processText(filePath))
-        break
-      case '.docx':
-        ({ content, metadata } = await this.processDocx(filePath))
-        break
-      case '.tex':
-        ({ content, metadata } = await this.processLaTeX(filePath))
-        break
-      default:
-        throw new Error(`Unsupported file type: ${fileExtension}`)
+    if (fileType === 'application/pdf') {
+      ({ content, metadata } = await this.processPDF(file))
+    } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      ({ content, metadata } = await this.processDocx(file))
+    } else if (fileType === 'text/plain' || filename.endsWith('.tex')) {
+      ({ content, metadata } = await this.processText(file))
+    } else {
+      throw new Error(`Unsupported file type: ${fileType}`)
     }
 
     // Create chunks
@@ -101,74 +95,60 @@ export class DocumentProcessor {
     }
   }
 
-  // PDF processing (placeholder - would need pdf-parse in real implementation)
-  private async processPDF(filePath: string): Promise<{ content: string; metadata: DocumentMetadata }> {
-    try {
-      // In a real implementation, you would use pdf-parse here
-      const content = fs.readFileSync(filePath, 'utf8')
-      
-      return {
-        content,
-        metadata: {
-          fileType: 'pdf',
-          extractionMethod: 'pdf-parse',
-        }
+  // PDF processing using pdf-parse
+  private async processPDF(file: File): Promise<{ content: string; metadata: DocumentMetadata }> {
+    const buffer = await file.arrayBuffer()
+    const pdfParse = (await import('pdf-parse')).default
+    const data = await pdfParse(Buffer.from(buffer))
+    return {
+      content: data.text,
+      metadata: {
+        fileType: 'pdf',
+        extractionMethod: 'pdf-parse',
+        pageCount: data.numpages
       }
-    } catch (error) {
-      throw new Error(`Failed to process PDF: ${error}`)
     }
   }
 
-  // Text file processing
-  private async processText(filePath: string): Promise<{ content: string; metadata: DocumentMetadata }> {
-    const content = fs.readFileSync(filePath, 'utf8')
-    
+  // DOCX processing using mammoth
+  private async processDocx(file: File): Promise<{ content: string; metadata: DocumentMetadata }> {
+    const buffer = await file.arrayBuffer()
+    const mammoth = (await import('mammoth')).default
+    const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) })
     return {
-      content,
+      content: result.value,
       metadata: {
-        fileType: 'txt',
+        fileType: 'docx',
+        extractionMethod: 'mammoth',
+      }
+    }
+  }
+
+  // Text or LaTeX processing
+  private async processText(file: File): Promise<{ content: string; metadata: DocumentMetadata }> {
+    const text = await file.text()
+    let title: string | undefined
+    let authors: string[] | undefined
+    let abstract: string | undefined
+
+    // Extract LaTeX metadata if it's a .tex file
+    if (file.name.endsWith('.tex')) {
+      const titleMatch = text.match(/\\title\{([^}]+)\}/)
+      title = titleMatch ? titleMatch[1] : undefined
+      const authorMatch = text.match(/\\author\{([^}]+)\}/)
+      authors = authorMatch ? [authorMatch[1]] : undefined
+      const abstractMatch = text.match(/\\begin\{abstract\}([\s\S]*?)\\end\{abstract\}/)
+      abstract = abstractMatch ? abstractMatch[1].trim() : undefined
+    }
+
+    return {
+      content: text,
+      metadata: {
+        fileType: file.type,
         extractionMethod: 'direct-read',
-      }
-    }
-  }
-
-  // DOCX processing (placeholder - would need mammoth in real implementation)
-  private async processDocx(filePath: string): Promise<{ content: string; metadata: DocumentMetadata }> {
-    try {
-      // In a real implementation, you would use mammoth here
-      const content = fs.readFileSync(filePath, 'utf8')
-      
-      return {
-        content,
-        metadata: {
-          fileType: 'docx',
-          extractionMethod: 'mammoth',
-        }
-      }
-    } catch (error) {
-      throw new Error(`Failed to process DOCX: ${error}`)
-    }
-  }
-
-  // LaTeX processing
-  private async processLaTeX(filePath: string): Promise<{ content: string; metadata: DocumentMetadata }> {
-    const content = fs.readFileSync(filePath, 'utf8')
-    
-    // Extract title from LaTeX
-    const titleMatch = content.match(/\\title\{([^}]+)\}/)
-    const title = titleMatch ? titleMatch[1] : undefined
-
-    // Extract authors
-    const authorMatch = content.match(/\\author\{([^}]+)\}/)
-    const authors = authorMatch ? [authorMatch[1]] : undefined
-
-    return {
-      content,
-      metadata: {
         title,
         authors,
-        fileType: 'tex',
-        extractionMethod: 'latex-parser',
+        abstract
       }
     }
   }
