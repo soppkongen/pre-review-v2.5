@@ -1,9 +1,13 @@
-import { EpistemicAgent } from './agents/epistemic-agent';
-import { AgentResult } from './agents/agent-types';
+import { runAgentSystem } from './agents/agent-runner';
+import { readFileAsText } from './document-processor';
 
-export async function runAgentSystem(documentText: string): Promise<AgentResult[]> {
-  const agent = new EpistemicAgent();
-  const result = await agent.run(documentText);
-  return [result];
+export class RealAnalysisOrchestrator {
+  static async analyzeDocument(file: File, summary?: string, reviewMode?: string): Promise<string> {
+    const text = await readFileAsText(file);
+    const results = await runAgentSystem(text);
+
+    console.log('Agent results:', results);
+
+    return `analysis-${Date.now()}`;
+  }
 }
-
