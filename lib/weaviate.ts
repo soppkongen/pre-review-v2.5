@@ -52,3 +52,30 @@ export function initializeWeaviateClient(): WeaviateClient {
 
 // Explicitly export to match imports elsewhere
 export const getWeaviateClient = initializeWeaviateClient;
+
+/**
+ * Ensures the Weaviate schema for PhysicsChunk exists. Creates it if missing.
+ */
+export async function initializeWeaviateSchema() {
+  const client = initializeWeaviateClient();
+  const className = 'PhysicsChunk';
+
+  // Check if the class already exists
+  const schema = await client.schema.getter().do();
+  const exists = schema.classes && schema.classes.some((c: any) => c.class === className);
+  if (exists) {
+    return;
+  }
+
+  // Create the class if it doesn't exist
+  await client.schema.classCreator().withClass({
+    class: className,
+    description: 'A chunk of a physics document',
+    properties: [
+      { name: 'content', dataType: ['text'], description: 'Chunk content' },
+      { name: 'source', dataType: ['string'], description: 'Source document or section' },
+      { name: 'embedding', dataType: ['number[]'], description: 'Vector embedding' },
+      { name: 'createdAt', dataType: ['date'], description: 'Creation timestamp' }
+    ]
+  }).do();
+}
