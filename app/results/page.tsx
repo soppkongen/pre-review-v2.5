@@ -37,6 +37,8 @@ interface AnalysisResult {
   recommendations: string[]
   agentResults: AgentResult[]
   detailedAnalysis: DetailedAnalysis
+  status: string
+  error?: string
 }
 
 interface AgentResult {
@@ -145,9 +147,25 @@ export default function ResultsPage() {
     )
   }
 
+  // Show backend error or status warning
+  const showStatusWarning = results.status !== 'completed' || (results.error && results.error.length > 0)
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
+        {showStatusWarning && (
+          <div className={`mb-6 p-4 rounded-lg border ${results.status === 'failed' ? 'bg-red-100 border-red-400 text-red-800' : 'bg-yellow-100 border-yellow-400 text-yellow-800'}`}> 
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              <span className="font-semibold">
+                {results.status === 'failed' ? 'Analysis Failed' : 'Analysis Incomplete'}
+              </span>
+            </div>
+            {results.error && (
+              <div className="mt-2 text-sm">{results.error}</div>
+            )}
+          </div>
+        )}
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
