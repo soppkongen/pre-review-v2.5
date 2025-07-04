@@ -35,8 +35,15 @@ export class RealAnalysisOrchestrator {
       
       await AnalysisStorage.storeAnalysis(analysisId, initialResult)
       
-      // Start async processing
+      // Start async processing with error handling
+      console.log(`[Orchestrator] Starting async processing for analysisId: ${analysisId}`)
       this.processDocumentAsync(analysisId, file, summary, reviewMode)
+        .catch(error => {
+          console.error(`[Orchestrator] Async processing failed for analysisId: ${analysisId}:`, error)
+          // Update status to failed
+          AnalysisStorage.updateAnalysisStatus(analysisId, 'failed', error.message || 'Async processing failed')
+            .catch(storageError => console.error('Failed to update status:', storageError))
+        })
       
       return analysisId
     } catch (error) {

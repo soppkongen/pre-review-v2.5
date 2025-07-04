@@ -3,102 +3,77 @@ import { RealDocumentProcessor } from '@/lib/real-document-processor'
 import { initializeWeaviateSchema, searchPhysicsKnowledge } from '@/lib/weaviate'
 import { AnalysisStorage } from '@/lib/kv-storage'
 import { KnowledgeBaseService } from '@/lib/services/knowledge-base'
-import { getConfig } from '@/lib/config'
+import { getConfig, getKVConfig, getWeaviateConfig, getOpenAIConfig } from '@/lib/config'
 
 export async function GET(request: NextRequest) {
-  const testResults = {
-    timestamp: new Date().toISOString(),
-    status: 'running',
-    tests: {} as any,
-    errors: [] as string[]
-  }
-
   try {
-    // Test 1: Environment Variables
     const config = getConfig()
-    testResults.tests.environment = {
-      weaviate_url: !!config.WEAVIATE_URL,
-      weaviate_api_key: !!config.WEAVIATE_API_KEY,
-      openai_api_key: !!config.OPENAI_API_KEY,
-      kv_rest_api_url: !!config.KV_REST_API_URL,
-      kv_rest_api_token: !!config.KV_REST_API_TOKEN,
-      app_name: config.APP_NAME,
-      app_version: config.APP_VERSION,
-      node_env: config.NODE_ENV
+    
+    // Test configuration
+    const configTest = {
+      hasOpenAI: !!config.OPENAI_API_KEY,
+      hasWeaviate: !!(config.WEAVIATE_URL && config.WEAVIATE_API_KEY),
+      hasKV: !!(config.KV_REST_API_URL && config.KV_REST_API_TOKEN),
+      nodeEnv: config.NODE_ENV,
+      isProduction: config.IS_PRODUCTION,
+      isDevelopment: config.IS_DEVELOPMENT
     }
-
-    // Test 2: Document Processor
+    
+    // Test KV storage connection
+    let kvTest = { connected: false, error: null as string | null }
     try {
-      const supportedTypes = RealDocumentProcessor.getSupportedFileTypes()
-      const maxSize = RealDocumentProcessor.getMaxFileSize()
-      testResults.tests.documentProcessor = {
-        supportedTypes,
-        maxSize,
-        status: 'working'
+      await AnalysisStorage.ping()
+      kvTest.connected = true
+    } catch (error) {
+      kvTest.error = error instanceof Error ? error.message : 'Unknown error'
+    }
+    
+    // Test Weaviate connection
+    let weaviateTest = { connected: false, error: null as string | null }
+    try {
+      const results = await searchPhysicsKnowledge('test', 1)
+      weaviateTest.connected = true
+    } catch (error) {
+      weaviateTest.error = error instanceof Error ? error.message : 'Unknown error'
+    }
+    
+    // Test document processor
+    let processorTest = { working: false, error: null as string | null }
+    try {
+      const testFile = new File(['Test content'], 'test.txt', { type: 'text/plain' })
+      const processed = await RealDocumentProcessor.processFile(testFile)
+      processorTest.working = !!processed && !!processed.chunks
+    } catch (error) {
+      processorTest.error = error instanceof Error ? error.message : 'Unknown error'
+    }
+    
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      config: configTest,
+      kvStorage: kvTest,
+      weaviate: weaviateTest,
+      documentProcessor: processorTest,
+      summary: {
+        allServicesWorking: configTest.hasOpenAI && configTest.hasWeaviate && configTest.hasKV && kvTest.connected && weaviateTest.connected && processorTest.working,
+        missingConfig: {
+          openai: !configTest.hasOpenAI,
+          weaviate: !configTest.hasWeaviate,
+          kv: !configTest.hasKV
+        },
+        connectionIssues: {
+          kv: !kvTest.connected,
+          weaviate: !weaviateTest.connected,
+          processor: !processorTest.working
+        }
       }
-    } catch (error) {
-      testResults.tests.documentProcessor = { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' }
-      testResults.errors.push(`Document Processor: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-
-    // Test 3: Weaviate Connection
-    try {
-      await initializeWeaviateSchema()
-      testResults.tests.weaviate = { status: 'connected' }
-    } catch (error) {
-      testResults.tests.weaviate = { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' }
-      testResults.errors.push(`Weaviate: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-
-    // Test 4: Knowledge Base Search
-    try {
-      const results = await searchPhysicsKnowledge('quantum mechanics', 2)
-      testResults.tests.knowledgeSearch = {
-        status: 'working',
-        resultsCount: results.length
-      }
-    } catch (error) {
-      testResults.tests.knowledgeSearch = { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' }
-      testResults.errors.push(`Knowledge Search: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-
-    // Test 5: Redis Storage
-    try {
-      const pingResult = await AnalysisStorage.ping()
-      testResults.tests.redis = {
-        status: pingResult ? 'connected' : 'failed',
-        ping: pingResult
-      }
-    } catch (error) {
-      testResults.tests.redis = { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' }
-      testResults.errors.push(`Redis: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-
-    // Test 6: Knowledge Base Service
-    try {
-      const knowledgeService = new KnowledgeBaseService()
-      const stats = await knowledgeService.getKnowledgeStats()
-      testResults.tests.knowledgeService = {
-        status: 'working',
-        totalConcepts: stats.totalConcepts
-      }
-    } catch (error) {
-      testResults.tests.knowledgeService = { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' }
-      testResults.errors.push(`Knowledge Service: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-
-    // Determine overall status
-    const failedTests = Object.values(testResults.tests).filter((test: any) => test.status === 'failed').length
-    testResults.status = failedTests === 0 ? 'all_passing' : `${failedTests}_tests_failed`
-
-    return NextResponse.json(testResults, { 
-      status: failedTests === 0 ? 200 : 503 
     })
-
   } catch (error) {
-    testResults.status = 'error'
-    testResults.errors.push(`Test execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    return NextResponse.json(testResults, { status: 500 })
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, { status: 500 })
   }
 }
 
