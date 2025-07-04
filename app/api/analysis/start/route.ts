@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeWeaviateClient } from '@/lib/weaviate';
-import { DocumentChunk } from './real-document-processor';
+import { RealAnalysisOrchestrator } from '@/lib/real-analysis-orchestrator';
 
 const client = initializeWeaviateClient();
 
@@ -17,23 +17,13 @@ export async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
+    const summary = form.get('summary') as string | undefined;
+    const reviewMode = form.get('reviewMode') as string | undefined;
 
-    // Read file bytes
-    const arrayBuffer = await file.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
+    // Start the real analysis and get the analysisId
+    const analysisId = await RealAnalysisOrchestrator.analyzeDocument(file, summary, reviewMode);
 
-    // Example: send to Weaviate schema initialization
-    await client.schema
-      .getter()
-      .do()
-      .catch(() => {
-        throw new Error('Failed to initialize Weaviate schema');
-      });
-
-    // Example: further processing (e.g., chunking, embedding)
-    // const chunks: DocumentChunk[] = await processDocument(fileBuffer);
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, analysisId });
   } catch (error: any) {
     console.error('Error in /analysis/start:', error);
     return NextResponse.json(
