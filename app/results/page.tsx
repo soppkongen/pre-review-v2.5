@@ -261,12 +261,12 @@ export default function ResultsPage() {
                 <div>
                   <h4 className="font-medium text-green-700 mb-2">Strengths</h4>
                   <ul className="space-y-1">
-                    {results.strengths.map((strength, index) => (
+                    {Array.isArray(results.strengths) ? results.strengths.map((strength, index) => (
                       <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
                         <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                         {strength}
                       </li>
-                    ))}
+                    )) : null}
                   </ul>
                 </div>
                 
@@ -275,12 +275,12 @@ export default function ResultsPage() {
                 <div>
                   <h4 className="font-medium text-orange-700 mb-2">Areas for Improvement</h4>
                   <ul className="space-y-1">
-                    {results.weaknesses.map((weakness, index) => (
+                    {Array.isArray(results.weaknesses) ? results.weaknesses.map((weakness, index) => (
                       <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
                         <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
                         {weakness}
                       </li>
-                    ))}
+                    )) : null}
                   </ul>
                 </div>
               </div>
@@ -307,7 +307,7 @@ export default function ResultsPage() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis.epistemicEvaluation.details}</p>
-                {results.detailedAnalysis.epistemicEvaluation.issues.length > 0 && (
+                {results.detailedAnalysis && Array.isArray(results.detailedAnalysis.epistemicEvaluation.issues) && results.detailedAnalysis.epistemicEvaluation.issues.length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-gray-700 mb-1">Issues to Address:</p>
                     <ul className="text-xs text-gray-600 space-y-1">
@@ -365,7 +365,7 @@ export default function ResultsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {results.agentResults.map((agent, index) => (
+              {Array.isArray(results.agentResults) ? results.agentResults.map((agent, index) => (
                 <div key={index} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -381,23 +381,23 @@ export default function ResultsPage() {
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-2">Key Findings</h5>
                       <ul className="text-sm text-gray-600 space-y-1">
-                        {agent.findings.map((finding, fIndex) => (
+                        {Array.isArray(agent.findings) ? agent.findings.map((finding, fIndex) => (
                           <li key={fIndex}>• {finding}</li>
-                        ))}
+                        )) : null}
                       </ul>
                     </div>
                     
                     <div>
                       <h5 className="text-sm font-medium text-gray-700 mb-2">Recommendations</h5>
                       <ul className="text-sm text-gray-600 space-y-1">
-                        {agent.recommendations.map((rec, rIndex) => (
+                        {Array.isArray(agent.recommendations) ? agent.recommendations.map((rec, rIndex) => (
                           <li key={rIndex}>• {rec}</li>
-                        ))}
+                        )) : null}
                       </ul>
                     </div>
                   </div>
                 </div>
-              ))}
+              )) : null}
             </div>
           </CardContent>
         </Card>
@@ -412,14 +412,14 @@ export default function ResultsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {results.recommendations.map((recommendation, index) => (
+              {Array.isArray(results.recommendations) ? results.recommendations.map((recommendation, index) => (
                 <div key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
                   <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
                     {index + 1}
                   </div>
                   <p className="text-gray-700">{recommendation}</p>
                 </div>
-              ))}
+              )) : null}
             </div>
           </CardContent>
         </Card>
