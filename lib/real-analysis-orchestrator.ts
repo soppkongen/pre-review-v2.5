@@ -1,5 +1,5 @@
 import { runAgents } from './agents/agent-runner';
-import { readFileAsText } from './document-processor';
+import { readFileAsText } from './services/document-processor';
 import type { AgentAnalysis } from './agents/agent-types';
 
 export class RealAnalysisOrchestrator {
@@ -9,8 +9,7 @@ export class RealAnalysisOrchestrator {
     reviewMode?: string
   ): Promise<{ id: string; results: AgentAnalysis[] }> {
     const text = await readFileAsText(file);
-
-    const chunks = [{ content: text }]; // evt. chunking forbedres senere
+    const chunks = [{ content: text }];
     const results = await runAgents(chunks);
 
     console.log('Agent results:', results);
