@@ -173,62 +173,55 @@ export class RealDocumentProcessor {
   }
 
   private static async processPDF(file: File): Promise<{ text: string; pages: number }> {
+    const buffer = await file.arrayBuffer();
+    const pdfBuffer = Buffer.from(buffer);
+    // Try pdf-parse first
     try {
-      const buffer = await file.arrayBuffer()
-      
-      // Try to use a different approach to avoid the test file issue
-      let pdfParse: any
-      
-      // Method 1: Try direct import
+      let pdfParse: any;
       try {
-        const module = await import('pdf-parse')
-        pdfParse = module.default || module
+        const module = await import('pdf-parse');
+        pdfParse = module.default || module;
       } catch (e) {
-        // Method 2: Try require if import fails
         try {
-          pdfParse = require('pdf-parse')
+          pdfParse = require('pdf-parse');
         } catch (e2) {
-          throw new Error('PDF parsing library not available')
+          pdfParse = null;
         }
       }
-      
-      // Create buffer and parse
-      const pdfBuffer = Buffer.from(buffer)
-      
-      // Use a try-catch around the actual parsing to catch the test file error
-      let data: any
+      if (pdfParse) {
+        const data = await pdfParse(pdfBuffer);
+        if (data && data.text) {
+          return {
+            text: data.text,
+            pages: data.numpages || 1
+          };
+        }
+      }
+      throw new Error('pdf-parse did not extract text');
+    } catch (primaryError) {
+      // Fallback: try pdfjs-dist
       try {
-        data = await pdfParse(pdfBuffer)
-      } catch (parseError: any) {
-        // If it's the test file error, try a different approach
-        if (parseError.message && parseError.message.includes('test/data')) {
-          // Try parsing without any options
-          data = await pdfParse(pdfBuffer, null)
-        } else {
-          throw parseError
+        // @ts-ignore: No types for pdfjs-dist/legacy/build/pdf.js
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
+        const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+        const pdf = await loadingTask.promise;
+        let text = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map((item: any) => item.str).join(' ') + '\n';
         }
-      }
-      
-      if (!data || !data.text) {
-        throw new Error('No text content extracted from PDF')
-      }
-      
-      return {
-        text: data.text,
-        pages: data.numpages || 1
-      }
-    } catch (error) {
-      console.error('PDF processing error:', error)
-      
-      // Provide a helpful error message
-      if (error instanceof Error) {
-        if (error.message.includes('test/data') || error.message.includes('ENOENT')) {
-          throw new Error('PDF processing failed due to library configuration. Please try a different PDF file or contact support.')
+        if (text.trim().length === 0) {
+          throw new Error('No text content extracted from PDF (pdfjs-dist fallback)');
         }
-        throw new Error(`PDF processing failed: ${error.message}`)
+        return {
+          text,
+          pages: pdf.numPages
+        };
+      } catch (fallbackError) {
+        // If both fail, throw a combined error
+        throw new Error(`PDF processing failed. pdf-parse error: ${primaryError instanceof Error ? primaryError.message : primaryError}. pdfjs-dist error: ${fallbackError instanceof Error ? fallbackError.message : fallbackError}`);
       }
-      
-      throw new Error('PDF processing failed: Unknown error')
     }
   }
 
