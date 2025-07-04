@@ -1,13 +1,15 @@
-import { AgentAnalysis, DocumentChunk } from './agent-types';
-import { EpistemicAgent } from './epistemic-agent';
+import { runAgents } from './agents/agent-runner';
+import { readFileAsText } from './document-processor';
 
-export async function runAgents(chunks: DocumentChunk[]): Promise<AgentAnalysis[]> {
-  const fullText = chunks.map(c => c.content).join('\n\n');
-  console.log('[AgentRunner] Received', chunks.length, 'chunks, total chars:', fullText.length);
+export class RealAnalysisOrchestrator {
+  static async analyzeDocument(file: File, summary?: string, reviewMode?: string): Promise<string> {
+    const text = await readFileAsText(file);
 
-  const results: AgentAnalysis[] = [];
-  results.push(await runEpistemicAgent(fullText));
+    const chunks = [{ content: text }]; // Minimal chunking – evt. forbedres senere
+    const results = await runAgents(chunks);
 
-  console.log('[AgentRunner] Returning', results.length, 'agent results');
-  return results;
+    console.log('Agent results:', results);
+
+    return `analysis-${Date.now()}`;
+  }
 }
