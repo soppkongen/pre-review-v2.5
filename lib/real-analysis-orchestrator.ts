@@ -2,16 +2,7 @@ import { RealDocumentProcessor, ProcessedDocument } from './real-document-proces
 import { initializeWeaviateSchema, storePhysicsChunk, searchPhysicsKnowledge, PhysicsChunk } from './weaviate'
 import { AnalysisStorage, AnalysisResult } from './kv-storage'
 import { v4 as uuidv4 } from 'uuid'
-
-// Agent interfaces
-interface AgentAnalysis {
-  agent: string
-  role: string
-  confidence: number
-  findings: string[]
-  recommendations: string[]
-  score?: number
-}
+import type { AgentAnalysis } from './real-openai-agents'
 
 interface DetailedAnalysis {
   epistemicEvaluation: { score: number; description: string }
@@ -113,23 +104,38 @@ export class RealAnalysisOrchestrator {
       
       // Step 6: Generate final analysis
       console.log(`[Orchestrator] Generating final analysis for analysisId: ${analysisId}`)
+      // Ensure all agentAnalyses have a numeric score
+      const safeAgentAnalyses = agentAnalyses.map(a => ({ ...a, score: typeof a.score === 'number' ? a.score : 0 })) as AgentAnalysis[]
       const finalAnalysis = await this.generateFinalAnalysis(
         processedDoc,
-        agentAnalyses || [],
+        safeAgentAnalyses,
         relevantKnowledge || []
       )
       
       // Step 7: Store final result
       const processingTime = Date.now() - startTime
+      // Check if analysis is truly complete
+      const requiredFieldsPresent = (
+        typeof finalAnalysis.overallScore === 'number' &&
+        typeof finalAnalysis.confidence === 'number' &&
+        finalAnalysis.detailedAnalysis &&
+        finalAnalysis.detailedAnalysis.epistemicEvaluation &&
+        finalAnalysis.detailedAnalysis.methodologyAssessment &&
+        finalAnalysis.detailedAnalysis.paradigmIndependence &&
+        finalAnalysis.detailedAnalysis.reproducibility &&
+        Array.isArray(finalAnalysis.agentAnalysis) && finalAnalysis.agentAnalysis.length > 0 &&
+        typeof finalAnalysis.executiveSummary === 'string' && finalAnalysis.executiveSummary.length > 0
+      )
       const result: AnalysisResult = {
         analysisId,
         documentName: file.name,
         reviewMode,
         summary,
-        status: 'completed',
+        status: requiredFieldsPresent ? 'completed' : 'failed',
         ...finalAnalysis,
         timestamp: new Date().toISOString(),
-        processingTimeMs: processingTime
+        processingTimeMs: processingTime,
+        error: requiredFieldsPresent ? undefined : 'Analysis incomplete: missing required fields.'
       }
       
       console.log(`[Orchestrator] Storing final analysis result for analysisId: ${analysisId}`)
@@ -299,7 +305,8 @@ export class RealAnalysisOrchestrator {
       confidence: Math.min(Math.max(confidence, 0), 100),
       findings,
       recommendations,
-      score: confidence / 10
+      score: typeof confidence === 'number' ? confidence / 10 : 0,
+      reasoning: findings.join('\n') + '\n' + recommendations.join('\n')
     }
   }
 
@@ -357,7 +364,8 @@ export class RealAnalysisOrchestrator {
       confidence: Math.min(Math.max(confidence, 0), 100),
       findings,
       recommendations,
-      score: confidence / 10
+      score: typeof confidence === 'number' ? confidence / 10 : 0,
+      reasoning: findings.join('\n') + '\n' + recommendations.join('\n')
     }
   }
 
@@ -413,11 +421,12 @@ export class RealAnalysisOrchestrator {
     
     return {
       agent: 'Experimental Designer',
-      role: 'Testable predictions and validation',
+      role: 'Experimental design and methodology',
       confidence: Math.min(Math.max(confidence, 0), 100),
       findings,
       recommendations,
-      score: confidence / 10
+      score: typeof confidence === 'number' ? confidence / 10 : 0,
+      reasoning: findings.join('\n') + '\n' + recommendations.join('\n')
     }
   }
 
@@ -476,7 +485,8 @@ export class RealAnalysisOrchestrator {
       confidence: Math.min(Math.max(confidence, 0), 100),
       findings,
       recommendations,
-      score: confidence / 10
+      score: typeof confidence === 'number' ? confidence / 10 : 0,
+      reasoning: findings.join('\n') + '\n' + recommendations.join('\n')
     }
   }
 
@@ -535,7 +545,8 @@ export class RealAnalysisOrchestrator {
       confidence: Math.min(Math.max(confidence, 0), 100),
       findings,
       recommendations,
-      score: confidence / 10
+      score: typeof confidence === 'number' ? confidence / 10 : 0,
+      reasoning: findings.join('\n') + '\n' + recommendations.join('\n')
     }
   }
 
@@ -550,9 +561,9 @@ export class RealAnalysisOrchestrator {
     const { RealOpenAIAgents } = await import('./real-openai-agents')
     
     // Calculate overall score from agent scores
-    const scores = agentAnalyses.map(a => a.score)
-    const overallScore = scores.reduce((sum, score) => sum + score, 0) / scores.length
-    const confidence = Math.round(agentAnalyses.reduce((sum, a) => sum + a.confidence, 0) / agentAnalyses.length)
+    const scores = agentAnalyses.map(a => typeof a.score === 'number' ? a.score : 0)
+    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0
+    const confidence = agentAnalyses.length > 0 ? Math.round(agentAnalyses.reduce((sum, a) => sum + (typeof a.confidence === 'number' ? a.confidence : 0), 0) / agentAnalyses.length) : 0
     
     // Determine rating
     let rating = 'Poor'
@@ -583,15 +594,15 @@ export class RealAnalysisOrchestrator {
     const detailedAnalysis: DetailedAnalysis = {
       epistemicEvaluation: {
         score: Math.round((overallScore * 0.9) * 10) / 10,
-        description: agentAnalyses.find(a => a.agent === 'Epistemic Analyst')?.reasoning.substring(0, 100) || 'Strong epistemic foundations'
+        description: agentAnalyses.find(a => a.agent === 'Epistemic Analyst' && typeof a.reasoning === 'string')?.reasoning?.substring(0, 100) || 'Strong epistemic foundations'
       },
       methodologyAssessment: {
         score: Math.round((overallScore * 0.95) * 10) / 10,
-        description: agentAnalyses.find(a => a.agent === 'Experimental Designer')?.reasoning.substring(0, 100) || 'Sound methodology'
+        description: agentAnalyses.find(a => a.agent === 'Experimental Designer' && typeof a.reasoning === 'string')?.reasoning?.substring(0, 100) || 'Sound methodology'
       },
       paradigmIndependence: {
         score: Math.round((overallScore * 0.85) * 10) / 10,
-        description: agentAnalyses.find(a => a.agent === 'Paradigm Analyst')?.reasoning.substring(0, 100) || 'Good paradigm independence'
+        description: agentAnalyses.find(a => a.agent === 'Paradigm Analyst' && typeof a.reasoning === 'string')?.reasoning?.substring(0, 100) || 'Good paradigm independence'
       },
       reproducibility: {
         score: Math.round((overallScore * 0.92) * 10) / 10,
