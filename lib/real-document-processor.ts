@@ -449,6 +449,46 @@ export class RealDocumentProcessor {
     if (intermediateCount > 2 || advancedCount > 0) return 'intermediate'
     return 'beginner'
   }
+
+  static getSupportedFileTypes(): string[] {
+    return [
+      'application/pdf',
+      'text/plain',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/x-tex',
+      'text/x-tex',
+    ];
+  }
+
+  static getMaxFileSize(): number {
+    return 10 * 1024 * 1024; // 10MB
+  }
+
+  static getFileTypeFromName(filename: string): string {
+    const extension = filename.toLowerCase().split('.').pop();
+    switch (extension) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'txt':
+        return 'text/plain';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'tex':
+        return 'application/x-tex';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  // Utility to get full content from a ProcessedDocument
+  static getContent(doc: ProcessedDocument): string {
+    return doc.chunks.map(chunk => chunk.content).join('\n\n');
+  }
+
+  // Utility to get title from a ProcessedDocument
+  static getTitle(doc: ProcessedDocument): string {
+    return doc.metadata.title || doc.metadata.fileName;
+  }
 }
       
 

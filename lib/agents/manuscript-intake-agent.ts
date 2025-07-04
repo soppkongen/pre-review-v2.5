@@ -1,9 +1,9 @@
 import { BaseAgent, AgentCapabilities, AnalysisContext, AnalysisResult } from './base-agent'
-import { DocumentProcessor, ProcessedDocument } from '../document-processor'
+import { RealDocumentProcessor, ProcessedDocument } from '../real-document-processor'
 import { storeResearchPaper, ResearchPaper } from '../weaviate'
 
 export class ManuscriptIntakeAgent extends BaseAgent {
-  private documentProcessor: DocumentProcessor
+  private documentProcessor: typeof RealDocumentProcessor
 
   constructor() {
     const capabilities: AgentCapabilities = {
@@ -15,7 +15,7 @@ export class ManuscriptIntakeAgent extends BaseAgent {
     }
 
     super('manuscript-intake', 'Manuscript Intake Agent', 'Document processing and standardization', capabilities)
-    this.documentProcessor = new DocumentProcessor()
+    this.documentProcessor = RealDocumentProcessor
   }
 
   async analyze(context: AnalysisContext): Promise<AnalysisResult> {
@@ -23,21 +23,18 @@ export class ManuscriptIntakeAgent extends BaseAgent {
     
     try {
       // Process the document
-      const filePath = context.metadata?.filePath
-      const filename = context.metadata?.filename
-      
-      if (!filePath || !filename) {
-        throw new Error('File path and filename are required for document processing')
+      const file = context.metadata?.file
+      if (!file) {
+        throw new Error('File object is required for document processing')
       }
-
-      const processedDoc = await this.documentProcessor.processDocument(filePath, filename)
+      const processedDoc = await this.documentProcessor.processFile(file)
       
       // Store document chunks in Weaviate
       await this.documentProcessor.storeDocumentChunks(processedDoc)
       
       // Store research paper metadata
       const researchPaper: ResearchPaper = {
-        title: processedDoc.metadata.title || filename,
+        title: processedDoc.metadata.title || file.name,
         authors: processedDoc.metadata.authors || [],
         abstract: processedDoc.metadata.abstract || '',
         content: processedDoc.content,
@@ -89,7 +86,7 @@ export class ManuscriptIntakeAgent extends BaseAgent {
   }
 
   validateInput(context: AnalysisContext): boolean {
-    return !!(context.metadata?.filePath && context.metadata?.filename)
+    return !!(context.metadata?.file)
   }
 
   getRequiredCapabilities(): string[] {

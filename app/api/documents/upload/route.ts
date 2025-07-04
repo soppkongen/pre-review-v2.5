@@ -1,7 +1,7 @@
 console.log('ENV:', process.env);
 
 import { type NextRequest, NextResponse } from "next/server"
-import { DocumentProcessor } from "@/lib/services/document-processor"
+import { RealDocumentProcessor } from "@/lib/real-document-processor"
 import { getWeaviateClient } from "@/lib/weaviate"
 
 export async function POST(request: NextRequest) {
@@ -15,21 +15,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    const processor = new DocumentProcessor()
-
-    // Check file size
-    if (file.size > processor.getMaxFileSize()) {
-      return NextResponse.json({ error: "File size exceeds maximum limit (10MB)" }, { status: 400 })
-    }
-
-    // Check file type
-    const supportedTypes = processor.getSupportedFileTypes()
-    if (!supportedTypes.includes(file.type) && !supportedTypes.includes(processor["getFileTypeFromName"](file.name))) {
-      return NextResponse.json({ error: "Unsupported file type" }, { status: 400 })
-    }
+    const processor = RealDocumentProcessor
 
     // Process the document
-    const processed = await processor.processDocument(file)
+    const processed = await processor.processFile(file)
 
     // Extract authors from content (simple heuristic)
     const authors = this.extractAuthors(processed.content)
@@ -117,7 +106,7 @@ function extractAbstract(content: string): string {
 }
 
 export async function GET() {
-  const processor = new DocumentProcessor()
+  const processor = RealDocumentProcessor
 
   return NextResponse.json({
     supportedFileTypes: processor.getSupportedFileTypes(),
