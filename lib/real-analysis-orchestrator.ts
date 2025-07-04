@@ -133,11 +133,16 @@ export class RealAnalysisOrchestrator {
       
     } catch (error) {
       console.error(`Error processing document ${file.name}:`, error)
-      
       // Store error result
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-      console.error(`Updating analysis status to failed with error: ${errorMsg}`)
-      
+      let errorMsg: string
+      if (error instanceof Error) {
+        errorMsg = error.message
+      } else if (typeof error === 'string') {
+        errorMsg = error
+      } else {
+        errorMsg = JSON.stringify(error)
+      }
+      console.error(`Updating analysis status to failed with error:`, errorMsg)
       try {
         await AnalysisStorage.updateAnalysisStatus(
           analysisId,
@@ -147,7 +152,6 @@ export class RealAnalysisOrchestrator {
       } catch (storageError) {
         console.error('Failed to update analysis status:', storageError)
       }
-      
       throw error // Re-throw to be caught by the route handler
     }
   }

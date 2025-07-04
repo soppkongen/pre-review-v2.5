@@ -83,9 +83,13 @@ export class AnalysisStorage {
     try {
       const result = await this.getRedis().get(`analysis:${analysisId}`)
       if (!result) return null
-      
-      // Always parse the result as we always store it as a string
-      return JSON.parse(result as string) as AnalysisResult
+      try {
+        // Always parse the result as we always store it as a string
+        return JSON.parse(result as string) as AnalysisResult
+      } catch (parseError) {
+        console.error('Failed to parse analysis result from storage:', result)
+        return null
+      }
     } catch (error) {
       console.error('Error retrieving analysis:', error)
       throw error
@@ -108,13 +112,12 @@ export class AnalysisStorage {
           status,
           timestamp: new Date().toISOString()
         }
-        if (error) newResult.error = error
+        if (error) newResult.error = typeof error === 'string' ? error : JSON.stringify(error)
         await this.storeAnalysis(analysisId, newResult)
         return
       }
-
       existingResult.status = status
-      if (error) existingResult.error = error
+      if (error) existingResult.error = typeof error === 'string' ? error : JSON.stringify(error)
       await this.storeAnalysis(analysisId, existingResult)
     } catch (error) {
       console.error('Error updating analysis status:', error)

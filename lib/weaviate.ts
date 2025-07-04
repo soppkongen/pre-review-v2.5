@@ -95,3 +95,38 @@ export async function storePhysicsChunk(chunk: any) {
     })
     .do();
 }
+
+// PhysicsChunk interface for type safety
+export interface PhysicsChunk {
+  chunkId?: string;
+  content: string;
+  source?: string;
+  embedding?: number[];
+  createdAt?: string;
+  metadata?: any;
+  domain?: string;
+}
+
+/**
+ * Search for relevant PhysicsChunk objects in Weaviate by query string.
+ * Returns an array of PhysicsChunk.
+ */
+export async function searchPhysicsKnowledge(query: string, limit: number = 5): Promise<PhysicsChunk[]> {
+  const client = initializeWeaviateClient();
+  const response = await client.graphql.get()
+    .withClassName('PhysicsChunk')
+    .withFields('content source embedding createdAt')
+    .withNearText({ concepts: [query] })
+    .withLimit(limit)
+    .do();
+
+  // Parse and return results
+  const data = response.data?.Get?.PhysicsChunk || [];
+  return data.map((item: any) => ({
+    content: item.content,
+    source: item.source,
+    embedding: item.embedding,
+    createdAt: item.createdAt,
+    // Add more fields as needed
+  }));
+}
