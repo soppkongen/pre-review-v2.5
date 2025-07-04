@@ -122,3 +122,7 @@ export class AnalysisStorage {
     }
   }
 }
+
+export async function getAnalysisResult(analysisId: string) {
+  return AnalysisStorage.getAnalysis(analysisId);
+}
