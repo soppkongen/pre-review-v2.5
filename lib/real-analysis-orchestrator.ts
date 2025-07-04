@@ -15,3 +15,6 @@ export class RealAnalysisOrchestrator {
     return `analysis-${Date.now()}`;
   }
 }
+
+// Export as function for frontend compatibility
+export const analyzeDocument = RealAnalysisOrchestrator.analyzeDocument;
