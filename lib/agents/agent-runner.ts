@@ -1,5 +1,5 @@
 import { AgentAnalysis, DocumentChunk } from './agent-types';
-import { runEpistemicAgent } from './agents/epistemic-agent';
+import { EpistemicAgent } from './epistemic-agent';
 
 export async function runAgents(chunks: DocumentChunk[]): Promise<AgentAnalysis[]> {
   const fullText = chunks.map(c => c.content).join('\n\n');
