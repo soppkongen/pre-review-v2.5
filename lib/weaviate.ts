@@ -79,3 +79,19 @@ export async function initializeWeaviateSchema() {
     ]
   }).do();
 }
+
+/**
+ * Stores a physics document chunk in Weaviate.
+ */
+export async function storePhysicsChunk(chunk: any) {
+  const client = initializeWeaviateClient();
+  await client.data.creator()
+    .withClassName('PhysicsChunk')
+    .withProperties({
+      content: chunk.content,
+      source: chunk.metadata?.source || '',
+      embedding: chunk.embedding || undefined,
+      createdAt: new Date().toISOString(),
+    })
+    .do();
+}
