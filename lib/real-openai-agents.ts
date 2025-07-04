@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { PhysicsChunk } from './real-weaviate'
+import { PhysicsChunk } from './weaviate'
 import { ProcessedDocument } from './real-document-processor'
 
 // Initialize OpenAI client
@@ -355,7 +355,7 @@ Respond in JSON format:
     confidence: number
     domains: string[]
   }> {
-    const domains = [...new Set(relevantKnowledge.map(k => k.domain))].filter(d => d !== 'general')
+    const domains = [...new Set(relevantKnowledge.map(k => k.domain).filter(d => d && d !== 'general'))]
     
     const prompt = `You are a brilliant theoretical physicist and research mentor helping develop new physics theories.
 
@@ -366,7 +366,7 @@ ${relevantKnowledge.slice(0, 5).map(k => `
 Domain: ${k.domain}
 Source: ${k.sourceDocument}
 Content: ${k.content.substring(0, 300)}
-Concepts: ${k.concepts.join(', ')}
+Concepts: ${k.concepts?.join(', ') || 'None'}
 ${k.hasMathematicalContent ? `Equations: ${k.equations?.slice(0, 2).join(', ')}` : ''}
 `).join('\n---\n')}
 
@@ -398,7 +398,7 @@ Be specific, technical, and actionable. Reference the knowledge base findings.`
       return {
         response: content,
         confidence,
-        domains
+        domains: domains as string[]
       }
     } catch (error) {
       console.error('Theory lab chat error:', error)

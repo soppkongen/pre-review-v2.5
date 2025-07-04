@@ -21,10 +21,10 @@ export async function POST(request: NextRequest) {
     const processed = await processor.processFile(file)
 
     // Extract authors from content (simple heuristic)
-    const authors = this.extractAuthors(processed.content)
+    const authors = extractAuthors(RealDocumentProcessor.getContent(processed))
 
     // Extract abstract (simple heuristic)
-    const abstract = this.extractAbstract(processed.content)
+    const abstract = extractAbstract(RealDocumentProcessor.getContent(processed))
 
     // Store in Weaviate
     const client = getWeaviateClient()
@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
       .creator()
       .withClassName("ResearchPaper")
       .withProperties({
-        title: processed.title,
+        title: RealDocumentProcessor.getTitle(processed),
         authors: authors,
         abstract: abstract,
-        content: processed.content,
+        content: RealDocumentProcessor.getContent(processed),
         field: field,
         keywords: keywords
           .split(",")
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       paperId: result.id,
-      title: processed.title,
+      title: RealDocumentProcessor.getTitle(processed),
       metadata: processed.metadata,
       message: "Document uploaded and processed successfully",
     })
@@ -87,7 +87,7 @@ function extractAuthors(content: string): string[] {
 
 function extractAbstract(content: string): string {
   // Look for abstract section
-  const abstractMatch = content.match(/abstract[:\s]*(.*?)(?:\n\s*\n|\n\s*(?:introduction|keywords|1\.|i\.))/is)
+  const abstractMatch = content.match(/abstract[:\s]*(.*?)(?:\n\s*\n|\n\s*(?:introduction|keywords|1\.|i\.))/i)
 
   if (abstractMatch) {
     return abstractMatch[1].trim().substring(0, 1000)

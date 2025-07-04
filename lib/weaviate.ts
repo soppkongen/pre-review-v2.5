@@ -107,10 +107,26 @@ export interface PhysicsChunk {
   chunkId?: string;
   content: string;
   source?: string;
+  sourceDocument?: string;
   embedding?: number[];
   createdAt?: string;
   metadata?: any;
   domain?: string;
+  concepts?: string[];
+  equations?: string[];
+  hasMathematicalContent?: boolean;
+}
+
+// PhysicsKnowledge interface for type safety
+export interface PhysicsKnowledge {
+  concept: string;
+  description: string;
+  field: string;
+  difficulty: string;
+  equations?: string[];
+  applications?: string[];
+  relatedConcepts?: string[];
+  examples?: string[];
 }
 
 /**
