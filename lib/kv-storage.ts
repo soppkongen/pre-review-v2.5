@@ -68,9 +68,9 @@ export class AnalysisStorage {
     }
   }
 
-  static async storeAnalysis(analysisId: string, result: AnalysisResult): Promise<void> {
+  static async storeAnalysis(analysisId: string, result: AnalysisResult | string): Promise<void> {
     try {
-      const resultString = JSON.stringify(result)
+      const resultString = typeof result === 'string' ? result : JSON.stringify(result)
       await this.getRedis().set(`analysis:${analysisId}`, resultString)
       await this.getRedis().expire(`analysis:${analysisId}`, 30 * 24 * 60 * 60)
     } catch (error) {
@@ -83,11 +83,17 @@ export class AnalysisStorage {
     try {
       const result = await this.getRedis().get(`analysis:${analysisId}`)
       if (!result) return null
-      try {
-        // Always parse the result as we always store it as a string
-        return JSON.parse(result as string) as AnalysisResult
-      } catch (parseError) {
-        console.error('Failed to parse analysis result from storage:', result)
+      if (typeof result === 'string') {
+        try {
+          return JSON.parse(result) as AnalysisResult
+        } catch (parseError) {
+          console.error('Failed to parse analysis result from storage:', result)
+          return null
+        }
+      } else if (typeof result === 'object') {
+        return result as AnalysisResult
+      } else {
+        console.error('Unexpected type for analysis result from storage:', typeof result)
         return null
       }
     } catch (error) {
