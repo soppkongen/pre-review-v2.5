@@ -1,17 +1,20 @@
 import { Redis } from '@upstash/redis'
+import { getKVConfig } from './config'
 
-// Initialize Redis client with Vercel KV credentials
+// Initialize Redis client with centralized configuration
 const getRedisClient = () => {
-  if (!process.env.KV_REST_API_URL) {
+  const kvConfig = getKVConfig()
+  
+  if (!kvConfig.url) {
     throw new Error('KV_REST_API_URL is not defined')
   }
-  if (!process.env.KV_REST_API_TOKEN) {
+  if (!kvConfig.token) {
     throw new Error('KV_REST_API_TOKEN is not defined')
   }
 
   return new Redis({
-    url: process.env.KV_REST_API_URL,
-    token: process.env.KV_REST_API_TOKEN
+    url: kvConfig.url,
+    token: kvConfig.token
   })
 }
 
@@ -70,9 +73,10 @@ export class AnalysisStorage {
 
   static async storeAnalysis(analysisId: string, result: AnalysisResult | string): Promise<void> {
     try {
+      const kvConfig = getKVConfig()
       const resultString = typeof result === 'string' ? result : JSON.stringify(result)
       await this.getRedis().set(`analysis:${analysisId}`, resultString)
-      await this.getRedis().expire(`analysis:${analysisId}`, 30 * 24 * 60 * 60)
+      await this.getRedis().expire(`analysis:${analysisId}`, kvConfig.ttl)
     } catch (error) {
       console.error('Error storing analysis:', error)
       throw new Error('Failed to store analysis result')

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getWeaviateClient } from "@/lib/weaviate"
+import { getOpenAIConfig } from "@/lib/config"
 
 export async function GET() {
   const health = {
@@ -25,7 +26,8 @@ export async function GET() {
 
   try {
     // Check OpenAI API key presence
-    if (process.env.OPENAI_API_KEY) {
+    const openAIConfig = getOpenAIConfig()
+    if (openAIConfig.apiKey) {
       health.services.openai = "configured"
     } else {
       health.services.openai = "not configured"

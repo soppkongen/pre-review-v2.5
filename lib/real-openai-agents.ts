@@ -1,10 +1,11 @@
 import OpenAI from 'openai'
 import { PhysicsChunk } from './weaviate'
 import { ProcessedDocument } from './real-document-processor'
+import { getOpenAIConfig } from './config'
 
-// Initialize OpenAI client
+// Initialize OpenAI client with centralized configuration
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: getOpenAIConfig().apiKey,
 })
 
 export interface AgentAnalysis {

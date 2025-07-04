@@ -3,6 +3,7 @@ import { RealDocumentProcessor } from '@/lib/real-document-processor'
 import { initializeWeaviateSchema, searchPhysicsKnowledge } from '@/lib/weaviate'
 import { AnalysisStorage } from '@/lib/kv-storage'
 import { KnowledgeBaseService } from '@/lib/services/knowledge-base'
+import { getConfig } from '@/lib/config'
 
 export async function GET(request: NextRequest) {
   const testResults = {
@@ -14,12 +15,16 @@ export async function GET(request: NextRequest) {
 
   try {
     // Test 1: Environment Variables
+    const config = getConfig()
     testResults.tests.environment = {
-      weaviate_url: !!process.env.WEAVIATE_URL,
-      weaviate_api_key: !!process.env.WEAVIATE_API_KEY,
-      openai_api_key: !!process.env.OPENAI_API_KEY,
-      kv_rest_api_url: !!process.env.KV_REST_API_URL,
-      kv_rest_api_token: !!process.env.KV_REST_API_TOKEN
+      weaviate_url: !!config.WEAVIATE_URL,
+      weaviate_api_key: !!config.WEAVIATE_API_KEY,
+      openai_api_key: !!config.OPENAI_API_KEY,
+      kv_rest_api_url: !!config.KV_REST_API_URL,
+      kv_rest_api_token: !!config.KV_REST_API_TOKEN,
+      app_name: config.APP_NAME,
+      app_version: config.APP_VERSION,
+      node_env: config.NODE_ENV
     }
 
     // Test 2: Document Processor

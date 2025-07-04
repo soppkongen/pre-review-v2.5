@@ -1,5 +1,6 @@
 import mammoth from 'mammoth'
 import { v4 as uuidv4 } from 'uuid'
+import { getDocumentConfig } from './config'
 
 export interface DocumentChunk {
   id: string
@@ -469,7 +470,7 @@ export class RealDocumentProcessor {
   }
 
   static getMaxFileSize(): number {
-    return 10 * 1024 * 1024; // 10MB
+    return getDocumentConfig().maxFileSize;
   }
 
   static getFileTypeFromName(filename: string): string {

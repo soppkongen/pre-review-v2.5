@@ -1,14 +1,10 @@
 import weaviate, { WeaviateClient, ApiKey } from 'weaviate-ts-client';
-
-// Debug logs to confirm environment variables at runtime
-console.log('🔍 WEAVIATE_URL:', process.env.WEAVIATE_URL);
-console.log('🔍 WEAVIATE_API_KEY set:', !!process.env.WEAVIATE_API_KEY);
-console.log('🔍 OPENAI_API_KEY set:', !!process.env.OPENAI_API_KEY);
+import { getWeaviateConfig, getOpenAIConfig, isDevelopment } from './config';
 
 let client: WeaviateClient | null = null;
 
 /**
- * Returns a singleton Weaviate client, configured from environment variables.
+ * Returns a singleton Weaviate client, configured from centralized configuration.
  * Throws an error if required variables are missing or invalid.
  */
 export function initializeWeaviateClient(): WeaviateClient {
@@ -16,35 +12,41 @@ export function initializeWeaviateClient(): WeaviateClient {
     return client;
   }
 
-  const rawUrl = process.env.WEAVIATE_URL;
-  const apiKey = process.env.WEAVIATE_API_KEY;
-  const openAiKey = process.env.OPENAI_API_KEY;
+  const weaviateConfig = getWeaviateConfig();
+  const openAIConfig = getOpenAIConfig();
 
-  if (!rawUrl || rawUrl === 'weaviate_url') {
+  // Debug logs in development
+  if (isDevelopment()) {
+    console.log('🔍 WEAVIATE_URL:', weaviateConfig.url);
+    console.log('🔍 WEAVIATE_API_KEY set:', !!weaviateConfig.apiKey);
+    console.log('🔍 OPENAI_API_KEY set:', !!openAIConfig.apiKey);
+  }
+
+  if (!weaviateConfig.url || weaviateConfig.url === 'weaviate_url') {
     throw new Error('[Weaviate] Environment variable WEAVIATE_URL is required and must be a valid URL');
   }
-  if (!apiKey) {
+  if (!weaviateConfig.apiKey) {
     throw new Error('[Weaviate] Environment variable WEAVIATE_API_KEY is required');
   }
-  if (!openAiKey) {
+  if (!openAIConfig.apiKey) {
     throw new Error('[Weaviate] Environment variable OPENAI_API_KEY is required');
   }
 
   // Validate the URL explicitly
   let parsedUrl: URL;
   try {
-    parsedUrl = new URL(rawUrl);
+    parsedUrl = new URL(weaviateConfig.url);
   } catch {
-    throw new Error(`[Weaviate] Invalid WEAVIATE_URL provided: ${rawUrl}`);
+    throw new Error(`[Weaviate] Invalid WEAVIATE_URL provided: ${weaviateConfig.url}`);
   }
 
   console.log('[Weaviate] Initializing Weaviate client for', parsedUrl.host)
   client = weaviate.client({
     scheme: parsedUrl.protocol.replace(':', ''),
     host: parsedUrl.host,
-    apiKey: new ApiKey(apiKey),
+    apiKey: new ApiKey(weaviateConfig.apiKey),
     headers: {
-      'X-OpenAI-Api-Key': openAiKey,
+      'X-OpenAI-Api-Key': openAIConfig.apiKey,
     },
   });
 
