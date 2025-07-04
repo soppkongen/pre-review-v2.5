@@ -173,15 +173,62 @@ export class RealDocumentProcessor {
   }
 
   private static async processPDF(file: File): Promise<{ text: string; pages: number }> {
-    const buffer = await file.arrayBuffer()
-    
-    // Dynamic import to prevent debug mode during build
-    const pdfParse = (await import('pdf-parse')).default
-    const data = await pdfParse(Buffer.from(buffer))
-    
-    return {
-      text: data.text,
-      pages: data.numpages
+    try {
+      const buffer = await file.arrayBuffer()
+      
+      // Try to use a different approach to avoid the test file issue
+      let pdfParse: any
+      
+      // Method 1: Try direct import
+      try {
+        const module = await import('pdf-parse')
+        pdfParse = module.default || module
+      } catch (e) {
+        // Method 2: Try require if import fails
+        try {
+          pdfParse = require('pdf-parse')
+        } catch (e2) {
+          throw new Error('PDF parsing library not available')
+        }
+      }
+      
+      // Create buffer and parse
+      const pdfBuffer = Buffer.from(buffer)
+      
+      // Use a try-catch around the actual parsing to catch the test file error
+      let data: any
+      try {
+        data = await pdfParse(pdfBuffer)
+      } catch (parseError: any) {
+        // If it's the test file error, try a different approach
+        if (parseError.message && parseError.message.includes('test/data')) {
+          // Try parsing without any options
+          data = await pdfParse(pdfBuffer, null)
+        } else {
+          throw parseError
+        }
+      }
+      
+      if (!data || !data.text) {
+        throw new Error('No text content extracted from PDF')
+      }
+      
+      return {
+        text: data.text,
+        pages: data.numpages || 1
+      }
+    } catch (error) {
+      console.error('PDF processing error:', error)
+      
+      // Provide a helpful error message
+      if (error instanceof Error) {
+        if (error.message.includes('test/data') || error.message.includes('ENOENT')) {
+          throw new Error('PDF processing failed due to library configuration. Please try a different PDF file or contact support.')
+        }
+        throw new Error(`PDF processing failed: ${error.message}`)
+      }
+      
+      throw new Error('PDF processing failed: Unknown error')
     }
   }
 
