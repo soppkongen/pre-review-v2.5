@@ -1,22 +1,17 @@
-import { runAgents } from './agents/agent-runner';
-import { readFileAsText } from './services/document-processor';
-import type { AgentAnalysis } from './agents/agent-types';
+import { runAgentSystem } from './agents/agent-runner';
+import { readFileAsText } from './real-document-processor';
 
 export class RealAnalysisOrchestrator {
   static async analyzeDocument(
     file: File,
     summary?: string,
     reviewMode?: string
-  ): Promise<{ id: string; results: AgentAnalysis[] }> {
+  ): Promise<string> {
     const text = await readFileAsText(file);
-    const chunks = [{ content: text }];
-    const results = await runAgents(chunks);
+    const results = await runAgentSystem(text);
 
     console.log('Agent results:', results);
 
-    return {
-      id: `analysis-${Date.now()}`,
-      results
-    };
+    return `analysis-${Date.now()}`;
   }
 }
