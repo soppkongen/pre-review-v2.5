@@ -18,38 +18,28 @@ export default function TheoryBootloaderPage() {
 
   const handleAnalyze = async () => {
     if (!concept.trim()) return
-
     setIsAnalyzing(true)
     setAnalysisProgress(0)
-
-    // Simulate analysis progress
-    const progressInterval = setInterval(() => {
-      setAnalysisProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval)
-          setIsAnalyzing(false)
-          // Mock analysis results
-          setAnalysisResults({
-            coreIdea: "Quantum field fluctuations in curved spacetime",
-            confidence: 0.87,
-            domains: ["Quantum Field Theory", "General Relativity", "Cosmology"],
-            gaps: [
-              "Mathematical framework for field quantization in dynamic spacetime",
-              "Experimental verification methods",
-              "Connection to observable phenomena",
-            ],
-            suggestions: [
-              "Explore AdS/CFT correspondence applications",
-              "Investigate Hawking radiation mechanisms",
-              "Consider implications for dark energy",
-            ],
-            relatedTheories: ["Hawking Radiation", "Unruh Effect", "Black Hole Information Paradox"],
-          })
-          return 100
-        }
-        return prev + 10
+    setAnalysisResults(null)
+    try {
+      // Call real backend API for theory analysis
+      const response = await fetch('/api/theory-lab/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: concept })
       })
-    }, 200)
+      const data = await response.json()
+      if (data.success && data.response) {
+        setAnalysisResults(data.response)
+      } else {
+        setAnalysisResults({ error: data.error || 'Analysis failed.' })
+      }
+    } catch (error) {
+      setAnalysisResults({ error: error instanceof Error ? error.message : 'Unknown error' })
+    } finally {
+      setIsAnalyzing(false)
+      setAnalysisProgress(100)
+    }
   }
 
   return (

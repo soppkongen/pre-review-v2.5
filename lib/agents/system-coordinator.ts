@@ -28,33 +28,7 @@ export class SystemCoordinator extends BaseAgent {
   }
 
   async analyze(context: AnalysisContext): Promise<AnalysisResult> {
-    const startTime = Date.now()
-    
-    try {
-      // For now, return a mock analysis result to avoid complex dependencies
-      const result: AnalysisResult = {
-        agentId: this.id,
-        analysisId: `analysis_${Date.now()}`,
-        confidence: 0.85,
-        findings: [
-          'Document structure analysis completed',
-          'Content validation performed',
-          'Multi-agent coordination successful'
-        ],
-        recommendations: [
-          'Consider expanding the theoretical framework',
-          'Add more experimental validation',
-          'Strengthen the literature review section'
-        ],
-        issues: [],
-        processingTimeMs: Date.now() - startTime,
-        timestamp: new Date()
-      }
-
-      return result
-    } catch (error) {
-      throw new Error(`Coordination failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
+    throw new Error('SystemCoordinator.analyze is not implemented. No mock data allowed.')
   }
 
   async coordinateAnalysis(context: any): Promise<CoordinationResult> {

@@ -26,7 +26,7 @@ interface SearchResult {
 }
 
 export default function KnowledgeBasePage() {
-  const [searchResults, setSearchResults] = useState([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDomains, setSelectedDomains] = useState<string[]>([])
@@ -45,51 +45,6 @@ export default function KnowledgeBasePage() {
     "Astrophysics",
     "Optics",
     "Nuclear Physics",
-  ]
-
-  const mockResults: SearchResult[] = [
-    {
-      id: "1",
-      title: "Quantum Field Theory in Curved Spacetime",
-      content:
-        "The formulation of quantum field theory in curved spacetime backgrounds presents unique challenges due to the absence of a preferred vacuum state. The Unruh effect demonstrates that the concept of particles is observer-dependent...",
-      domain: "Quantum Mechanics",
-      subdomain: "Quantum Field Theory",
-      difficulty: "advanced",
-      contentType: "textbook_chapter",
-      equations: ["⟨0|φ(x)φ(y)|0⟩", "Tμν = ⟨ψ|Tμν|ψ⟩"],
-      concepts: ["Unruh Effect", "Hawking Radiation", "Vacuum State"],
-      relevanceScore: 0.95,
-      chunkId: "qft_curved_001",
-    },
-    {
-      id: "2",
-      title: "Einstein Field Equations and Cosmological Solutions",
-      content:
-        "The Einstein field equations Gμν = 8πTμν relate the curvature of spacetime to the energy-momentum tensor. In cosmological contexts, the Friedmann equations emerge as solutions for homogeneous and isotropic universes...",
-      domain: "Relativity",
-      subdomain: "General Relativity",
-      difficulty: "intermediate",
-      contentType: "research_paper",
-      equations: ["Gμν = 8πTμν", "H² = (8πG/3)ρ - k/a²"],
-      concepts: ["Spacetime Curvature", "Cosmological Principle", "Friedmann Equations"],
-      relevanceScore: 0.89,
-      chunkId: "gr_cosmo_045",
-    },
-    {
-      id: "3",
-      title: "Quantum Entanglement and Bell's Theorem",
-      content:
-        "Bell's theorem demonstrates that no physical theory based on local hidden variables can reproduce all the predictions of quantum mechanics. The violation of Bell inequalities in experiments confirms the non-local nature of quantum correlations...",
-      domain: "Quantum Mechanics",
-      subdomain: "Quantum Information",
-      difficulty: "intermediate",
-      contentType: "textbook_chapter",
-      equations: ["⟨AB⟩ - ⟨AB'⟩ + ⟨A'B⟩ + ⟨A'B'⟩ ≤ 2"],
-      concepts: ["Bell Inequality", "Local Realism", "Quantum Non-locality"],
-      relevanceScore: 0.87,
-      chunkId: "qm_bell_023",
-    },
   ]
 
   const handleSearch = async (query: string) => {
