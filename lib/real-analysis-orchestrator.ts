@@ -230,30 +230,47 @@ export class RealAnalysisOrchestrator {
   ): Promise<AgentAnalysis[]> {
     const { RealOpenAIAgents } = await import('./real-openai-agents')
     const analyses: AgentAnalysis[] = []
-    
+    console.log('[DEBUG] runMultiAgentAnalysis: processedDoc.chunks.length =', processedDoc.chunks?.length)
     try {
       // Run all agents in parallel for efficiency
       const agentPromises = [
-        RealOpenAIAgents.theoreticalPhysicsAnalysis(processedDoc, relevantKnowledge),
-        RealOpenAIAgents.mathematicalAnalysis(processedDoc, relevantKnowledge),
-        RealOpenAIAgents.experimentalAnalysis(processedDoc, relevantKnowledge)
+        (async () => {
+          const result = await RealOpenAIAgents.theoreticalPhysicsAnalysis(processedDoc, relevantKnowledge)
+          console.log('[DEBUG] TheoreticalPhysicsAnalysis:', result)
+          return result
+        })(),
+        (async () => {
+          const result = await RealOpenAIAgents.mathematicalAnalysis(processedDoc, relevantKnowledge)
+          console.log('[DEBUG] MathematicalAnalysis:', result)
+          return result
+        })(),
+        (async () => {
+          const result = await RealOpenAIAgents.experimentalAnalysis(processedDoc, relevantKnowledge)
+          console.log('[DEBUG] ExperimentalAnalysis:', result)
+          return result
+        })()
       ]
-      
       if (reviewMode === 'full') {
         agentPromises.push(
-          RealOpenAIAgents.epistemicAnalysis(processedDoc, relevantKnowledge),
-          RealOpenAIAgents.paradigmAnalysis(processedDoc, relevantKnowledge)
+          (async () => {
+            const result = await RealOpenAIAgents.epistemicAnalysis(processedDoc, relevantKnowledge)
+            console.log('[DEBUG] EpistemicAnalysis:', result)
+            return result
+          })(),
+          (async () => {
+            const result = await RealOpenAIAgents.paradigmAnalysis(processedDoc, relevantKnowledge)
+            console.log('[DEBUG] ParadigmAnalysis:', result)
+            return result
+          })()
         )
       }
-      
       const results = await Promise.all(agentPromises)
       analyses.push(...results)
-      
+      console.log('[DEBUG] All agent results:', results)
     } catch (error) {
       console.error('Multi-agent analysis error:', error)
       throw new Error('Failed to complete multi-agent analysis')
     }
-    
     return analyses
   }
 
