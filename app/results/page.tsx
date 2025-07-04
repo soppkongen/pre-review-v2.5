@@ -301,13 +301,13 @@ export default function ResultsPage() {
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Epistemic Evaluation</h4>
                 <div className="flex items-center gap-3 mb-2">
-                  <Progress value={results.detailedAnalysis.epistemicEvaluation.score * 10} className="flex-1" />
-                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis.epistemicEvaluation.score)}`}>
-                    {results.detailedAnalysis.epistemicEvaluation.score}/10
+                  <Progress value={(results.detailedAnalysis?.epistemicEvaluation?.score ?? 0) * 10} className="flex-1" />
+                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis?.epistemicEvaluation?.score ?? 0)}`}>
+                    {results.detailedAnalysis?.epistemicEvaluation?.score ?? 'N/A'}/10
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis.epistemicEvaluation.details}</p>
-                {results.detailedAnalysis && Array.isArray(results.detailedAnalysis.epistemicEvaluation.issues) && results.detailedAnalysis.epistemicEvaluation.issues.length > 0 && (
+                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis?.epistemicEvaluation?.details ?? 'No details available.'}</p>
+                {Array.isArray(results.detailedAnalysis?.epistemicEvaluation?.issues) && results.detailedAnalysis.epistemicEvaluation.issues.length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-gray-700 mb-1">Issues to Address:</p>
                     <ul className="text-xs text-gray-600 space-y-1">
@@ -322,34 +322,34 @@ export default function ResultsPage() {
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Methodology Assessment</h4>
                 <div className="flex items-center gap-3 mb-2">
-                  <Progress value={results.detailedAnalysis.methodologyAssessment.score * 10} className="flex-1" />
-                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis.methodologyAssessment.score)}`}>
-                    {results.detailedAnalysis.methodologyAssessment.score}/10
+                  <Progress value={(results.detailedAnalysis?.methodologyAssessment?.score ?? 0) * 10} className="flex-1" />
+                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis?.methodologyAssessment?.score ?? 0)}`}>
+                    {results.detailedAnalysis?.methodologyAssessment?.score ?? 'N/A'}/10
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis.methodologyAssessment.details}</p>
+                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis?.methodologyAssessment?.details ?? 'No details available.'}</p>
               </div>
 
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Paradigm Independence</h4>
                 <div className="flex items-center gap-3 mb-2">
-                  <Progress value={results.detailedAnalysis.paradigmIndependence.score * 10} className="flex-1" />
-                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis.paradigmIndependence.score)}`}>
-                    {results.detailedAnalysis.paradigmIndependence.score}/10
+                  <Progress value={(results.detailedAnalysis?.paradigmIndependence?.score ?? 0) * 10} className="flex-1" />
+                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis?.paradigmIndependence?.score ?? 0)}`}>
+                    {results.detailedAnalysis?.paradigmIndependence?.score ?? 'N/A'}/10
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis.paradigmIndependence.details}</p>
+                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis?.paradigmIndependence?.details ?? 'No details available.'}</p>
               </div>
 
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Reproducibility</h4>
                 <div className="flex items-center gap-3 mb-2">
-                  <Progress value={results.detailedAnalysis.reproducibility.score * 10} className="flex-1" />
-                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis.reproducibility.score)}`}>
-                    {results.detailedAnalysis.reproducibility.score}/10
+                  <Progress value={(results.detailedAnalysis?.reproducibility?.score ?? 0) * 10} className="flex-1" />
+                  <span className={`font-semibold ${getScoreColor(results.detailedAnalysis?.reproducibility?.score ?? 0)}`}>
+                    {results.detailedAnalysis?.reproducibility?.score ?? 'N/A'}/10
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis.reproducibility.details}</p>
+                <p className="text-sm text-gray-600 mb-3">{results.detailedAnalysis?.reproducibility?.details ?? 'No details available.'}</p>
               </div>
             </div>
           </CardContent>
