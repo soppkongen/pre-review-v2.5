@@ -67,6 +67,20 @@ export class RealDocumentProcessor {
       throw new Error(`File size exceeds maximum limit (${this.getMaxFileSize()} bytes)`)
     }
     const supportedTypes = this.getSupportedFileTypes()
+
+    // Infer MIME type if missing
+    let effectiveType = file.type;
+    if (!effectiveType || effectiveType.trim() === '') {
+      if (file.name.endsWith('.pdf')) {
+        effectiveType = 'application/pdf';
+      } else if (file.name.endsWith('.docx')) {
+        effectiveType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      } else if (file.name.endsWith('.txt') || file.name.endsWith('.tex')) {
+        effectiveType = 'text/plain';
+      } else {
+        throw new Error(`Unable to infer file type for: ${file.name}`);
+      }
+    }
     if (!supportedTypes.includes(file.type) && !supportedTypes.includes(this.getFileTypeFromName(file.name))) {
       throw new Error(`Unsupported file type: ${file.type}`)
     }
@@ -78,7 +92,7 @@ export class RealDocumentProcessor {
       let abstract: string | undefined;
 
       // Extract text based on file type
-      if (file.type === 'application/pdf') {
+      if (effectiveType === 'application/pdf') {
         try {
           const result = await this.processPDF(file)
           text = result.text
@@ -87,14 +101,14 @@ export class RealDocumentProcessor {
           console.error('PDF processing error:', error)
           throw new Error('Failed to process PDF file')
         }
-      } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      } else if (effectiveType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         try {
           text = await this.processDocx(file)
         } catch (error) {
           console.error('DOCX processing error:', error)
           throw new Error('Failed to process DOCX file')
         }
-      } else if (file.type === 'text/plain' || file.name.endsWith('.tex')) {
+      } else if (effectiveType === 'text/plain' || file.name.endsWith('.tex')) {
         try {
           const result = await this.processText(file)
           text = result.text
