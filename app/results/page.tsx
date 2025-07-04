@@ -79,17 +79,17 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (analysisId) {
-      fetchResults(analysisId)
-    } else {
+    if (!analysisId || analysisId === 'undefined') {
       setError('No analysis ID provided')
       setLoading(false)
+    } else {
+      fetchResults(analysisId)
     }
   }, [analysisId])
 
   const fetchResults = async (id: string) => {
     try {
-      const response = await fetch(`/api/analysis/start?analysisId=${id}`)
+      const response = await fetch(`/api/analysis/${id}`)
       if (!response.ok) {
         throw new Error('Failed to fetch results')
       }
