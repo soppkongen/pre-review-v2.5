@@ -61,6 +61,14 @@ export class RealDocumentProcessor {
 
   static async processFile(file: File): Promise<ProcessedDocument> {
     const startTime = Date.now()
+    // File size/type checks
+    if (file.size > this.getMaxFileSize()) {
+      throw new Error(`File size exceeds maximum limit (${this.getMaxFileSize()} bytes)`)
+    }
+    const supportedTypes = this.getSupportedFileTypes()
+    if (!supportedTypes.includes(file.type) && !supportedTypes.includes(this.getFileTypeFromName(file.name))) {
+      throw new Error(`Unsupported file type: ${file.type}`)
+    }
     try {
       let text: string = '';
       let totalPages: number | undefined;
@@ -141,7 +149,7 @@ export class RealDocumentProcessor {
         }
       }
     } catch (error) {
-      console.error('Document processing error:', error)
+      console.error('[RealDocumentProcessor] Document processing error:', error)
       // Return a minimal valid document structure instead of throwing
       return {
         chunks: [{

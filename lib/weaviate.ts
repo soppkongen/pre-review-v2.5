@@ -21,13 +21,13 @@ export function initializeWeaviateClient(): WeaviateClient {
   const openAiKey = process.env.OPENAI_API_KEY;
 
   if (!rawUrl || rawUrl === 'weaviate_url') {
-    throw new Error('Environment variable WEAVIATE_URL is required and must be a valid URL');
+    throw new Error('[Weaviate] Environment variable WEAVIATE_URL is required and must be a valid URL');
   }
   if (!apiKey) {
-    throw new Error('Environment variable WEAVIATE_API_KEY is required');
+    throw new Error('[Weaviate] Environment variable WEAVIATE_API_KEY is required');
   }
   if (!openAiKey) {
-    throw new Error('Environment variable OPENAI_API_KEY is required');
+    throw new Error('[Weaviate] Environment variable OPENAI_API_KEY is required');
   }
 
   // Validate the URL explicitly
@@ -35,9 +35,10 @@ export function initializeWeaviateClient(): WeaviateClient {
   try {
     parsedUrl = new URL(rawUrl);
   } catch {
-    throw new Error(`Invalid WEAVIATE_URL provided: ${rawUrl}`);
+    throw new Error(`[Weaviate] Invalid WEAVIATE_URL provided: ${rawUrl}`);
   }
 
+  console.log('[Weaviate] Initializing Weaviate client for', parsedUrl.host)
   client = weaviate.client({
     scheme: parsedUrl.protocol.replace(':', ''),
     host: parsedUrl.host,
@@ -64,10 +65,12 @@ export async function initializeWeaviateSchema() {
   const schema = await client.schema.getter().do();
   const exists = schema.classes && schema.classes.some((c: any) => c.class === className);
   if (exists) {
+    console.log('[Weaviate] Schema already exists for PhysicsChunk')
     return;
   }
 
   // Create the class if it doesn't exist
+  console.log('[Weaviate] Creating schema for PhysicsChunk')
   await client.schema.classCreator().withClass({
     class: className,
     description: 'A chunk of a physics document',
@@ -78,6 +81,7 @@ export async function initializeWeaviateSchema() {
       { name: 'createdAt', dataType: ['date'], description: 'Creation timestamp' }
     ]
   }).do();
+  console.log('[Weaviate] Schema created for PhysicsChunk')
 }
 
 /**
@@ -85,6 +89,7 @@ export async function initializeWeaviateSchema() {
  */
 export async function storePhysicsChunk(chunk: any) {
   const client = initializeWeaviateClient();
+  console.log('[Weaviate] Storing chunk in Weaviate:', chunk?.content?.slice(0, 40) || '[no content]')
   await client.data.creator()
     .withClassName('PhysicsChunk')
     .withProperties({
@@ -94,6 +99,7 @@ export async function storePhysicsChunk(chunk: any) {
       createdAt: new Date().toISOString(),
     })
     .do();
+  console.log('[Weaviate] Chunk stored')
 }
 
 // PhysicsChunk interface for type safety
@@ -113,6 +119,7 @@ export interface PhysicsChunk {
  */
 export async function searchPhysicsKnowledge(query: string, limit: number = 5): Promise<PhysicsChunk[]> {
   const client = initializeWeaviateClient();
+  console.log('[Weaviate] Searching PhysicsChunk for query:', query)
   const response = await client.graphql.get()
     .withClassName('PhysicsChunk')
     .withFields('content source embedding createdAt')
@@ -122,6 +129,7 @@ export async function searchPhysicsKnowledge(query: string, limit: number = 5): 
 
   // Parse and return results
   const data = response.data?.Get?.PhysicsChunk || [];
+  console.log('[Weaviate] Search results:', data.length)
   return data.map((item: any) => ({
     content: item.content,
     source: item.source,

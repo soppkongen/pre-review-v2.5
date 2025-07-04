@@ -67,10 +67,11 @@ export class RealAnalysisOrchestrator {
     
     try {
       // Step 1: Initialize Weaviate schema
+      console.log(`[Orchestrator] Initializing Weaviate schema for analysisId: ${analysisId}`)
       await initializeWeaviateSchema()
       
       // Step 2: Process document and extract chunks
-      console.log(`Processing document: ${file.name}`)
+      console.log(`[Orchestrator] Processing document: ${file.name} for analysisId: ${analysisId}`)
       const processedDoc = await RealDocumentProcessor.processFile(file)
       
       if (!processedDoc || !processedDoc.chunks || processedDoc.chunks.length === 0) {
@@ -78,10 +79,10 @@ export class RealAnalysisOrchestrator {
       }
 
       // Log successful chunk generation
-      console.log(`Generated ${processedDoc.chunks.length} chunks`)
+      console.log(`[Orchestrator] Generated ${processedDoc.chunks.length} chunks for analysisId: ${analysisId}`)
       
       // Step 3: Store chunks in Weaviate
-      console.log(`Storing ${processedDoc.chunks.length} chunks in Weaviate`)
+      console.log(`[Orchestrator] Storing ${processedDoc.chunks.length} chunks in Weaviate for analysisId: ${analysisId}`)
       let storedChunks = 0
       for (const chunk of processedDoc.chunks) {
         try {
@@ -89,7 +90,7 @@ export class RealAnalysisOrchestrator {
           await storePhysicsChunk(chunk)
           storedChunks++
         } catch (error) {
-          console.error('Error storing chunk:', error)
+          console.error(`[Orchestrator] Error storing chunk for analysisId: ${analysisId}:`, error)
           // Continue with other chunks
         }
       }
@@ -99,9 +100,11 @@ export class RealAnalysisOrchestrator {
       }
 
       // Step 4: Retrieve relevant knowledge from Weaviate
+      console.log(`[Orchestrator] Gathering relevant knowledge for analysisId: ${analysisId}`)
       const relevantKnowledge = await this.gatherRelevantKnowledge(processedDoc, summary)
       
       // Step 5: Run multi-agent analysis
+      console.log(`[Orchestrator] Running multi-agent analysis for analysisId: ${analysisId}`)
       const agentAnalyses = await this.runMultiAgentAnalysis(
         processedDoc,
         relevantKnowledge || [],
@@ -109,6 +112,7 @@ export class RealAnalysisOrchestrator {
       )
       
       // Step 6: Generate final analysis
+      console.log(`[Orchestrator] Generating final analysis for analysisId: ${analysisId}`)
       const finalAnalysis = await this.generateFinalAnalysis(
         processedDoc,
         agentAnalyses || [],
@@ -128,6 +132,7 @@ export class RealAnalysisOrchestrator {
         processingTimeMs: processingTime
       }
       
+      console.log(`[Orchestrator] Storing final analysis result for analysisId: ${analysisId}`)
       await AnalysisStorage.storeAnalysis(analysisId, result)
       console.log(`Analysis completed for ${file.name} in ${processingTime}ms`)
       
