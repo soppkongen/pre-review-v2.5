@@ -25,6 +25,7 @@ export interface AnalysisResult {
   analysisId: string
   documentName: string
   reviewMode: string
+  analysisType?: string
   summary?: string
   status: 'processing' | 'completed' | 'failed'
   overallScore?: number
@@ -34,11 +35,30 @@ export interface AnalysisResult {
   keyFindings?: string[]
   strengths?: string[]
   improvements?: string[]
+  weaknesses?: string[]
+  recommendations?: string[]
   detailedAnalysis?: {
-    epistemicEvaluation: { score: number; description: string }
-    methodologyAssessment: { score: number; description: string }
-    paradigmIndependence: { score: number; description: string }
-    reproducibility: { score: number; description: string }
+    epistemicEvaluation: { 
+      score: number; 
+      description: string;
+      issues?: string[]
+    }
+    methodologyAssessment: { 
+      score: number; 
+      description: string;
+      strengths?: string[]
+      concerns?: string[]
+    }
+    paradigmIndependence: { 
+      score: number; 
+      description: string;
+      biases?: string[]
+    }
+    reproducibility: { 
+      score: number; 
+      description: string;
+      factors?: string[]
+    }
   }
   agentAnalysis?: Array<{
     agent: string
@@ -47,7 +67,6 @@ export interface AnalysisResult {
     findings: string[]
     recommendations: string[]
   }>
-  recommendations?: string[]
   timestamp: string
   processingTimeMs?: number
   error?: string

@@ -91,13 +91,32 @@ export default function ResultsPage() {
 
   const fetchResults = async (id: string) => {
     try {
+      console.log(`[Frontend] Fetching results for analysis ID: ${id}`)
       const response = await fetch(`/api/analysis/${id}`)
+      
+      console.log(`[Frontend] Response status: ${response.status}`)
+      console.log(`[Frontend] Response headers:`, Object.fromEntries(response.headers.entries()))
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch results')
+        const errorText = await response.text()
+        console.error(`[Frontend] Response not OK. Status: ${response.status}, Body:`, errorText)
+        throw new Error(`Failed to fetch results: ${response.status} ${errorText}`)
       }
+      
+      const contentType = response.headers.get('content-type')
+      console.log(`[Frontend] Content-Type: ${contentType}`)
+      
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text()
+        console.error(`[Frontend] Unexpected content type: ${contentType}. Response body:`, text)
+        throw new Error(`Unexpected content type: ${contentType}`)
+      }
+      
       const data = await response.json()
+      console.log(`[Frontend] Received data:`, data)
       setResults(data)
     } catch (err) {
+      console.error(`[Frontend] Error fetching results:`, err)
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)

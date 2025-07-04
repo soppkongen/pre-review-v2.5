@@ -5,13 +5,29 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  console.log(`[API] GET /api/analysis/${params.id} - Request received`)
+  
   try {
+    console.log(`[API] Retrieving analysis result for ID: ${params.id}`)
     const result = await getAnalysisResult(params.id)
     
+    console.log(`[API] Analysis result retrieved:`, {
+      found: !!result,
+      status: result?.status,
+      hasError: !!result?.error,
+      analysisId: result?.analysisId
+    })
+    
     if (!result) {
+      console.log(`[API] Analysis not found for ID: ${params.id}`)
       return NextResponse.json(
         { error: 'Analysis not found' },
-        { status: 404 }
+        { 
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
       )
     }
     
@@ -56,15 +72,27 @@ export async function GET(
       error: result.error || '',
     }
 
-    return NextResponse.json(safeResult)
+    console.log(`[API] Returning safe result with status: ${safeResult.status}`)
+    
+    return NextResponse.json(safeResult, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+      }
+    })
   } catch (error) {
-    console.error('Error retrieving analysis:', error)
+    console.error('[API] Error retrieving analysis:', error)
     return NextResponse.json(
       { 
         error: 'Failed to retrieve analysis',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     )
   }
 }

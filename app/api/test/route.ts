@@ -7,73 +7,119 @@ import { getConfig, getKVConfig, getWeaviateConfig, getOpenAIConfig } from '@/li
 
 export async function GET(request: NextRequest) {
   try {
-    const config = getConfig()
+    console.log('[TEST] Testing environment configuration...')
     
-    // Test configuration
-    const configTest = {
-      hasOpenAI: !!config.OPENAI_API_KEY,
-      hasWeaviate: !!(config.WEAVIATE_URL && config.WEAVIATE_API_KEY),
-      hasKV: !!(config.KV_REST_API_URL && config.KV_REST_API_TOKEN),
-      nodeEnv: config.NODE_ENV,
-      isProduction: config.IS_PRODUCTION,
-      isDevelopment: config.IS_DEVELOPMENT
+    // Test 1: Check environment variables
+    const kvConfig = getKVConfig()
+    const envCheck = {
+      hasKVUrl: !!kvConfig.url,
+      hasKVToken: !!kvConfig.token,
+      kvUrl: kvConfig.url ? 'Set' : 'Missing',
+      kvToken: kvConfig.token ? 'Set' : 'Missing'
     }
     
-    // Test KV storage connection
-    let kvTest = { connected: false, error: null as string | null }
-    try {
-      await AnalysisStorage.ping()
-      kvTest.connected = true
-    } catch (error) {
-      kvTest.error = error instanceof Error ? error.message : 'Unknown error'
+    console.log('[TEST] Environment check:', envCheck)
+    
+    if (!envCheck.hasKVUrl || !envCheck.hasKVToken) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required environment variables',
+        details: envCheck,
+        message: 'Please set KV_REST_API_URL and KV_REST_API_TOKEN in your .env.local file'
+      }, {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
     }
     
-    // Test Weaviate connection
-    let weaviateTest = { connected: false, error: null as string | null }
-    try {
-      const results = await searchPhysicsKnowledge('test', 1)
-      weaviateTest.connected = true
-    } catch (error) {
-      weaviateTest.error = error instanceof Error ? error.message : 'Unknown error'
+    // Test 2: Ping the storage
+    console.log('[TEST] Testing KV storage connection...')
+    const pingResult = await AnalysisStorage.ping()
+    console.log('[TEST] Ping result:', pingResult)
+    
+    // Test 3: Store a test analysis
+    const testId = 'test-analysis-' + Date.now()
+    const testAnalysis = {
+      analysisId: testId,
+      documentName: 'Test Document',
+      reviewMode: 'test',
+      status: 'completed' as const,
+      overallScore: 8.5,
+      confidence: 0.9,
+      summary: 'This is a test analysis',
+      keyFindings: ['Test finding 1', 'Test finding 2'],
+      strengths: ['Test strength 1'],
+      weaknesses: ['Test weakness 1'],
+      recommendations: ['Test recommendation 1'],
+      agentAnalysis: [{
+        agent: 'Test Agent',
+        role: 'Test Role',
+        confidence: 0.8,
+        findings: ['Test agent finding'],
+        recommendations: ['Test agent recommendation']
+      }],
+      detailedAnalysis: {
+        epistemicEvaluation: {
+          score: 8,
+          description: 'Test epistemic evaluation',
+          issues: []
+        },
+        methodologyAssessment: {
+          score: 7,
+          description: 'Test methodology assessment',
+          strengths: [],
+          concerns: []
+        },
+        paradigmIndependence: {
+          score: 9,
+          description: 'Test paradigm independence',
+          biases: []
+        },
+        reproducibility: {
+          score: 8,
+          description: 'Test reproducibility',
+          factors: []
+        }
+      },
+      timestamp: new Date().toISOString()
     }
     
-    // Test document processor
-    let processorTest = { working: false, error: null as string | null }
-    try {
-      const testFile = new File(['Test content'], 'test.txt', { type: 'text/plain' })
-      const processed = await RealDocumentProcessor.processFile(testFile)
-      processorTest.working = !!processed && !!processed.chunks
-    } catch (error) {
-      processorTest.error = error instanceof Error ? error.message : 'Unknown error'
-    }
+    console.log('[TEST] Storing test analysis...')
+    await AnalysisStorage.storeAnalysis(testId, testAnalysis)
+    
+    // Test 4: Retrieve the test analysis
+    console.log('[TEST] Retrieving test analysis...')
+    const retrievedAnalysis = await AnalysisStorage.getAnalysis(testId)
+    console.log('[TEST] Retrieved analysis:', retrievedAnalysis)
     
     return NextResponse.json({
       success: true,
-      timestamp: new Date().toISOString(),
-      config: configTest,
-      kvStorage: kvTest,
-      weaviate: weaviateTest,
-      documentProcessor: processorTest,
-      summary: {
-        allServicesWorking: configTest.hasOpenAI && configTest.hasWeaviate && configTest.hasKV && kvTest.connected && weaviateTest.connected && processorTest.working,
-        missingConfig: {
-          openai: !configTest.hasOpenAI,
-          weaviate: !configTest.hasWeaviate,
-          kv: !configTest.hasKV
-        },
-        connectionIssues: {
-          kv: !kvTest.connected,
-          weaviate: !weaviateTest.connected,
-          processor: !processorTest.working
-        }
+      environment: envCheck,
+      pingResult,
+      testId,
+      stored: testAnalysis,
+      retrieved: retrievedAnalysis,
+      match: JSON.stringify(testAnalysis) === JSON.stringify(retrievedAnalysis)
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
       }
     })
+    
   } catch (error) {
+    console.error('[TEST] Error:', error)
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 })
+      stack: error instanceof Error ? error.stack : undefined
+    }, {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
   }
 }
 
