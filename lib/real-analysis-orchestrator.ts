@@ -1,5 +1,5 @@
 import { runAgentSystem } from './agents/agent-runner';
-import { readFileAsText } from './real-document-processor';
+import readFileAsText from './real-document-processor';
 
 export class RealAnalysisOrchestrator {
   static async analyzeDocument(
@@ -15,6 +15,3 @@ export class RealAnalysisOrchestrator {
     return `analysis-${Date.now()}`;
   }
 }
-
-// Export as function for frontend compatibility
-export const analyzeDocument = RealAnalysisOrchestrator.analyzeDocument;
