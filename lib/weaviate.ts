@@ -1,4 +1,4 @@
-import weaviate, { WeaviateClient, ApiKey } from 'weaviate-ts-client';
+import weaviate, { WeaviateClient } from 'weaviate-ts-client';
 import { getWeaviateConfig, getOpenAIConfig, isDevelopment } from './config';
 
 let client: WeaviateClient | null = null;
@@ -44,8 +44,8 @@ export function initializeWeaviateClient(): WeaviateClient {
   client = weaviate.client({
     scheme: parsedUrl.protocol.replace(':', ''),
     host: parsedUrl.host,
-    apiKey: new ApiKey(weaviateConfig.apiKey),
     headers: {
+      'Authorization': `Bearer ${weaviateConfig.apiKey}`,
       'X-OpenAI-Api-Key': openAIConfig.apiKey,
     },
   });
