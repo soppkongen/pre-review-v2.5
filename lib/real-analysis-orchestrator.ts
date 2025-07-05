@@ -1,67 +1,95 @@
-// lib/services/agent-orchestrator.ts
-
-import { searchPhysicsKnowledge } from '@/lib/weaviate';
-import { getRedisClient } from '@/lib/db/redis';
+import { RealDocumentProcessor } from '../real-document-processor';
+import { RealOpenAIAgents } from '../real-openai-agents';
+import { AnalysisStorage } from '../kv-storage';
+import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
 
-// Simple in-memory queue for throttling
-const analysisQueue: Array<() => Promise<void>> = [];
-let runningTasks = 0;
-const MAX_CONCURRENT_TASKS = 1; // Only one analysis at a time
-const DELAY_BETWEEN_TASKS_MS = 8000; // 8 seconds delay between analyses
+export class AgentOrchestrator {
+  /**
+   * Starts analysis for a document and returns the analysisId immediately.
+   * The actual analysis runs asynchronously in the background.
+   */
+  async analyzeDocument(file: File, summary?: string, reviewMode: string = 'full'): Promise<string> {
+    const analysisId = uuidv4();
+    // Store initial status as 'processing'
+    await AnalysisStorage.store(analysisId, {
+      analysisId,
+      documentName: file.name,
+      reviewMode,
+      summary,
+      status: 'processing',
+      timestamp: new Date().toISOString()
+    });
+    // Start real analysis in background
+    this.processDocumentAsync(analysisId, file, summary, reviewMode);
+    return analysisId;
+  }
 
-async function processQueue() {
-  if (runningTasks >= MAX_CONCURRENT_TASKS || analysisQueue.length === 0) return;
-  runningTasks++;
-  const task = analysisQueue.shift();
-  if (task) {
+  /**
+   * Runs the actual document analysis and stores the completed result.
+   * Handles all agent execution and aggregation.
+   */
+  private async processDocumentAsync(
+    analysisId: string,
+    file: File,
+    summary?: string,
+    reviewMode: string = 'full'
+  ) {
     try {
-      await task();
-    } catch (error) {
-      console.error('[Orchestrator] Error processing analysis task:', error);
+      // 1. Extract text from the uploaded file
+      const processed = await RealDocumentProcessor.processFile(file);
+      const fullText = processed.getContent();
+
+      // 2. Retrieve relevant knowledge from Weaviate (for RAG)
+      const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
+
+      // 3. Run all AI agents (real OpenAI calls, with retrieved knowledge if desired)
+      const agentResults = await RealOpenAIAgents.runAllAgents(fullText, knowledge);
+
+      // 4. Aggregate results
+      const overallScore = Math.round(
+        agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length * 10
+      );
+      const confidence =
+        agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length;
+      const allFindings = agentResults.flatMap(a => a.findings);
+      const allRecommendations = agentResults.flatMap(a => a.recommendations);
+
+      // 5. Store the completed analysis result
+      await AnalysisStorage.store(analysisId, {
+        analysisId,
+        documentName: file.name,
+        reviewMode,
+        summary: allFindings.join('\n'),
+        status: 'completed',
+        timestamp: new Date().toISOString(),
+        agentResults,
+        overallScore,
+        confidence,
+        keyFindings: allFindings,
+        recommendations: allRecommendations,
+        detailedAnalysis: agentResults, // now includes all agent outputs
+        error: ''
+      });
+      console.log('[Orchestrator] Stored analysis result:', analysisId);
+    } catch (err) {
+      // Store the error for frontend display
+      await AnalysisStorage.store(analysisId, {
+        analysisId,
+        status: 'failed',
+        error: (err as Error).message,
+        timestamp: new Date().toISOString()
+      });
+      console.error('[Orchestrator] Analysis failed:', analysisId, err);
     }
   }
-  runningTasks--;
-  // Wait before starting the next task
-  setTimeout(() => {
-    processQueue();
-  }, DELAY_BETWEEN_TASKS_MS);
-}
 
-export async function agentOrchestrator(task: { type: string; query: string; limit?: number }) {
-  if (task.type === 'physics_knowledge_search') {
-    return new Promise<{ id: string }>((resolve) => {
-      const id = uuidv4();
-      analysisQueue.push(async () => {
-        try {
-          // Simulate long-running analysis (e.g., for big physics papers)
-          const result = await searchPhysicsKnowledge(task.query, task.limit || 5);
-          const analysis = {
-            id,
-            score: 8.5, // Replace with real scoring logic if needed
-            confidence: 0.95,
-            summary: 'Analysis complete',
-            details: result,
-          };
-          const client = getRedisClient();
-          await client.set(`analysis:${id}`, JSON.stringify(analysis), { EX: 3600 });
-          resolve({ id });
-        } catch (err) {
-          console.error('[Orchestrator] Analysis failed:', err);
-          resolve({ id }); // Still resolve to avoid hanging the queue
-        }
-      });
-      processQueue();
-    });
+  /**
+   * Retrieves an analysis result by ID.
+   */
+  async getAnalysisResult(id: string) {
+    const result = await AnalysisStorage.get(id);
+    if (result) return result;
+    return { status: 'processing' };
   }
-  return { error: 'Unknown task type' };
-}
-
-export async function getAnalysisResult(id: string) {
-  const client = getRedisClient();
-  const data = await client.get(`analysis:${id}`);
-  if (data) {
-    return JSON.parse(data);
-  }
-  return { status: 'processing' };
 }
