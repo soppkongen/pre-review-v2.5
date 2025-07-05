@@ -1,5 +1,3 @@
-// lib/weaviate.ts
-
 import weaviate, { WeaviateClient, ApiKey } from 'weaviate-client';
 
 const weaviateURL = process.env.WEAVIATE_URL as string;
@@ -57,7 +55,7 @@ export async function getSchema(): Promise<any | null> {
 }
 
 /**
- * Searches the PhysicsKnowledge class using a nearText query.
+ * Searches the PhysicsChunk class using a nearText query.
  */
 export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<any[]> {
   const client = await getWeaviateClient();
@@ -65,12 +63,24 @@ export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<
 
   try {
     const response = await client.graphql.get()
-      .withClassName('PhysicsKnowledge')
-      .withFields('title content source id')
+      .withClassName('PhysicsChunk')
+      .withFields(`
+        chunkId
+        content
+        sourceDocument
+        domain
+        subdomain
+        contentType
+        difficultyLevel
+        concepts
+        prerequisites
+        source
+      `)
       .withNearText({ concepts: [query] })
       .withLimit(limit)
       .do();
-    return response.data.Get.PhysicsKnowledge || [];
+
+    return response.data.Get.PhysicsChunk || [];
   } catch (error) {
     console.error('[searchPhysicsKnowledge] Weaviate query failed:', error);
     return [];
