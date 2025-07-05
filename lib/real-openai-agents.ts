@@ -1,9 +1,7 @@
-console.log("DEBUG: OPENAI_API_KEY is", process.env.OPENAI_API_KEY ? "set" : "MISSING OR EMPTY");
-
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // Reads from env
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export interface AgentResult {
