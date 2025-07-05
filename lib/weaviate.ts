@@ -1,10 +1,15 @@
-import weaviate, { WeaviateClient } from 'weaviate-client';
+// lib/weaviate.ts
+
+import weaviate, { WeaviateClient, ApiKey } from 'weaviate-client';
 
 const weaviateURL = process.env.WEAVIATE_URL as string;
 const weaviateApiKey = process.env.WEAVIATE_API_KEY as string;
 
 let client: WeaviateClient | null = null;
 
+/**
+ * Returns a singleton Weaviate client connected to your cloud instance.
+ */
 export async function getWeaviateClient(): Promise<WeaviateClient | null> {
   if (client) return client;
 
@@ -35,6 +40,9 @@ export async function getWeaviateClient(): Promise<WeaviateClient | null> {
   }
 }
 
+/**
+ * Fetches the full Weaviate schema.
+ */
 export async function getSchema(): Promise<any | null> {
   const client = await getWeaviateClient();
   if (!client) return null;
@@ -48,6 +56,9 @@ export async function getSchema(): Promise<any | null> {
   }
 }
 
+/**
+ * Searches the PhysicsKnowledge class using a nearText query.
+ */
 export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<any[]> {
   const client = await getWeaviateClient();
   if (!client) return [];
@@ -59,7 +70,6 @@ export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<
       .withNearText({ concepts: [query] })
       .withLimit(limit)
       .do();
-
     return response.data.Get.PhysicsKnowledge || [];
   } catch (error) {
     console.error('[searchPhysicsKnowledge] Weaviate query failed:', error);
