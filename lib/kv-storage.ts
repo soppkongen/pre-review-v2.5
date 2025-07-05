@@ -25,4 +25,12 @@ export async function getAnalysisResult(id: string) {
   return await get(`analysis:${id}`);
 }
 
+export const AnalysisStorage = {
+  storeAnalysis,
+  getAnalysisResult,
+  // Optionally, you can add get, set, del as well:
+  get,
+  set,
+  del,
+};
 
