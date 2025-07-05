@@ -1,5 +1,3 @@
-console.log("DEBUG: process.env.OPENAI_API_KEY at runtime:", process.env.OPENAI_API_KEY);
-
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -18,17 +16,18 @@ async function callOpenAI(role: string, prompt: string): Promise<string> {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
-      { role: "system", content: `You are a ${role} reviewing a scientific paper.` },
+      { role: "system", content: `You are a ${role} reviewing a scientific paper. Respond with numbered findings and recommendations.` },
       { role: "user", content: prompt },
     ],
     max_tokens: 512,
+    temperature: 0.7,
   });
   return completion.choices[0]?.message?.content ?? "No response";
 }
 
 export const RealOpenAIAgents = {
   async theoreticalAgent(text: string): Promise<AgentResult> {
-    const findings = await callOpenAI("theoretical physicist", `Analyze theoretically: ${text}`);
+    const findings = await callOpenAI("theoretical physicist", `Provide a theoretical analysis of this paper:\n\n${text}`);
     return {
       agentName: "Theoretical Physicist",
       role: "Theory",
@@ -38,7 +37,7 @@ export const RealOpenAIAgents = {
     };
   },
   async mathematicalAgent(text: string): Promise<AgentResult> {
-    const findings = await callOpenAI("mathematician", `Analyze mathematically: ${text}`);
+    const findings = await callOpenAI("mathematician", `Analyze the mathematical soundness and rigor of this paper:\n\n${text}`);
     return {
       agentName: "Mathematical Analyst",
       role: "Mathematics",
@@ -48,7 +47,7 @@ export const RealOpenAIAgents = {
     };
   },
   async epistemicAgent(text: string): Promise<AgentResult> {
-    const findings = await callOpenAI("epistemic reviewer", `Analyze for epistemic soundness: ${text}`);
+    const findings = await callOpenAI("epistemic reviewer", `Evaluate the epistemic quality and reliability of this paper:\n\n${text}`);
     return {
       agentName: "Epistemic Reviewer",
       role: "Epistemics",
