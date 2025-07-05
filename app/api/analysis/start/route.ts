@@ -1,23 +1,19 @@
-// app/api/analysis/start/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeDocument } from '@/lib/real-document-processor.ts';
+import { analyzeDocument } from '@/lib/real-document-processor';
 
 export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const file = formData.get('file') as File;
+
+  if (!file) {
+    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+  }
+
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-
-    if (!file) {
-      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const results = await analyzeDocument(buffer);
-
-    return NextResponse.json({ success: true, results });
+    const resultId = await analyzeDocument(file);
+    return NextResponse.json({ resultId }, { status: 200 });
   } catch (error) {
-    console.error('Error in /analysis/start:', error);
-    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
+    console.error('Analysis error:', error);
+    return NextResponse.json({ error: 'Document analysis failed' }, { status: 500 });
   }
 }
