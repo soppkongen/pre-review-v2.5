@@ -1,24 +1,24 @@
 import weaviate, { WeaviateClient, ApiKey } from 'weaviate-ts-client';
 
 const scheme = process.env.WEAVIATE_SCHEME || 'https';
+const fallbackHost = process.env.WEAVIATE_HOST || process.env.WEAVIATE_FALLBACK_HOST;
 const apiKey = process.env.WEAVIATE_API_KEY;
 
+let dynamicHost: string | null = null;
 let client: WeaviateClient | null = null;
 
 /**
- * Initialize Weaviate client dynamically by fetching hostname from meta.
+ * Initializes the Weaviate client, fetching the dynamic host if needed.
  */
 export async function getWeaviateClient(): Promise<WeaviateClient | null> {
-  if (client) return client; // reuse existing client
+  if (client && dynamicHost) return client;
 
-  // Use a fallback host from env for initial connection
-  const fallbackHost = process.env.WEAVIATE_FALLBACK_HOST;
   if (!fallbackHost) {
     console.warn('[Weaviate] No fallback host configured, cannot initialize client');
     return null;
   }
 
-  // Initialize client with fallback host to get meta info
+  // 1. Connect to fallback host just to fetch meta info
   const tempClient = weaviate.client({
     scheme,
     host: fallbackHost,
@@ -27,9 +27,9 @@ export async function getWeaviateClient(): Promise<WeaviateClient | null> {
 
   try {
     const meta = await tempClient.misc.metaGetter().do();
-    const dynamicHost = meta.hostname || fallbackHost;
+    dynamicHost = meta.hostname || fallbackHost;
 
-    // Create client with dynamic hostname
+    // 2. Now connect to the actual dynamic host
     client = weaviate.client({
       scheme,
       host: dynamicHost,
@@ -44,7 +44,7 @@ export async function getWeaviateClient(): Promise<WeaviateClient | null> {
 }
 
 /**
- * Get the full schema from Weaviate.
+ * Fetches the full Weaviate schema.
  */
 export async function getSchema(): Promise<any | null> {
   const client = await getWeaviateClient();
@@ -60,7 +60,7 @@ export async function getSchema(): Promise<any | null> {
 }
 
 /**
- * Search physics knowledge using Weaviate nearText query.
+ * Example: Search physics knowledge using the dynamic client.
  */
 export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<any[]> {
   const client = await getWeaviateClient();
@@ -73,7 +73,6 @@ export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<
       .withNearText({ concepts: [query] })
       .withLimit(limit)
       .do();
-
     return response.data.Get.PhysicsKnowledge || [];
   } catch (error) {
     console.error('[searchPhysicsKnowledge] Weaviate query failed:', error);
