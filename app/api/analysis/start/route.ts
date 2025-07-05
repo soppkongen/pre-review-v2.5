@@ -4,16 +4,18 @@ import { analyzeDocument } from '@/lib/real-document-processor';
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get('file') as File;
+  const summary = formData.get('summary') as string;
+  const reviewMode = formData.get('reviewMode') as string;
 
   if (!file) {
-    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    return NextResponse.json({ error: 'Missing file' }, { status: 400 });
   }
 
   try {
-    const resultId = await analyzeDocument(file);
-    return NextResponse.json({ resultId }, { status: 200 });
+    const resultId = await analyzeDocument(file, summary, reviewMode);
+    return NextResponse.json({ resultId });
   } catch (error) {
     console.error('Analysis error:', error);
-    return NextResponse.json({ error: 'Document analysis failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
   }
 }
