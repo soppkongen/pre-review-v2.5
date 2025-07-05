@@ -13,7 +13,6 @@ class Creator {
   }
 
   async do() {
-    // Simulate storing data and returning an id
     return { id: `mock-id-${Date.now()}` }
   }
 }
@@ -27,5 +26,13 @@ class Data {
 export function getWeaviateClient() {
   return {
     data: new Data(),
+    misc: {
+      metaGetter: () => ({
+        async do() {
+          return { status: 'ok' }
+        }
+      })
+    }
   }
 }
+
