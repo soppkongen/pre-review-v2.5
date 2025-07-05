@@ -27,3 +27,13 @@ export async function set<T = any>(key: string, value: T): Promise<void> {
 export async function del(key: string): Promise<void> {
   await redis.del(key);
 }
+
+// --- Analysis helpers ---
+
+export async function storeAnalysis(id: string, data: any) {
+  await set(`analysis:${id}`, data);
+}
+
+export async function getAnalysisResult(id: string) {
+  return await get(`analysis:${id}`);
+}
