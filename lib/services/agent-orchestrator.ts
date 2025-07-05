@@ -1,6 +1,7 @@
 import { RealDocumentProcessor } from '../real-document-processor';
 import { RealOpenAIAgents } from '../real-openai-agents';
 import { AnalysisStorage } from '../kv-storage';
+import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
 
 export class AgentOrchestrator {
@@ -14,31 +15,50 @@ export class AgentOrchestrator {
       status: 'processing',
       timestamp: new Date().toISOString()
     });
+    // Start real analysis in background
     this.processDocumentAsync(analysisId, file, summary, reviewMode);
     return analysisId;
   }
 
   private async processDocumentAsync(analysisId: string, file: File, summary?: string, reviewMode: string = 'full') {
-    const processed = await RealDocumentProcessor.processFile(file);
-    const fullText = processed.getContent();
+    try {
+      const processed = await RealDocumentProcessor.processFile(file);
+      const fullText = processed.getContent();
 
-    // Run all AI agents (real OpenAI calls)
-    const agentResults = await RealOpenAIAgents.runAllAgents(fullText);
+      // Retrieve relevant knowledge from Weaviate (optional, for RAG)
+      const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
 
-    // Optionally: Search Weaviate for relevant knowledge
-    // const knowledge = await searchPhysicsKnowledge("quantum mechanics");
+      // Run all AI agents (real OpenAI calls, with retrieved knowledge if desired)
+      const agentResults = await RealOpenAIAgents.runAllAgents(fullText);
 
-    await AnalysisStorage.store(analysisId, {
-      analysisId,
-      documentName: file.name,
-      reviewMode,
-      summary,
-      status: 'completed',
-      timestamp: new Date().toISOString(),
-      agentResults,
-      overallScore: Math.round(agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length * 10),
-      confidence: agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length,
-      summary: agentResults.map(a => a.findings.join(' ')).join(' '),
-    });
+      // Aggregate results
+      const overallScore = Math.round(agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length * 10);
+      const confidence = agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length;
+      const allFindings = agentResults.flatMap(a => a.findings);
+      const allRecommendations = agentResults.flatMap(a => a.recommendations);
+
+      await AnalysisStorage.store(analysisId, {
+        analysisId,
+        documentName: file.name,
+        reviewMode,
+        summary: allFindings.join('\n'),
+        status: 'completed',
+        timestamp: new Date().toISOString(),
+        agentResults,
+        overallScore,
+        confidence,
+        keyFindings: allFindings,
+        recommendations: allRecommendations,
+        detailedAnalysis: {}, // Fill in with more agent outputs as needed
+        error: ''
+      });
+    } catch (err) {
+      await AnalysisStorage.store(analysisId, {
+        analysisId,
+        status: 'failed',
+        error: (err as Error).message,
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 }
