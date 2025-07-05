@@ -15,7 +15,6 @@
     "NEXT_PUBLIC_APP_URL": "https://www.pre-review.com/",
     "NEXT_PUBLIC_APP_NAME": "Pre-Review Platform",
     "NEXT_PUBLIC_APP_VERSION": "2.5.0",
-    "OPENAI_API_KEY": "openai_api_key",
     "OPENAI_MODEL": "gpt-4-turbo-preview",
     "OPENAI_MAX_TOKENS": "4000",
     "OPENAI_TEMPERATURE": "0.7",
