@@ -3,27 +3,18 @@
 import { Redis } from '@upstash/redis';
 
 const redis = new Redis({
-   url: process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN!,
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
 });
 
-/**
- * Get a value by key from Redis.
- */
 export async function get<T = any>(key: string): Promise<T | null> {
   return await redis.get<T>(key);
 }
 
-/**
- * Set a value by key in Redis.
- */
 export async function set<T = any>(key: string, value: T): Promise<void> {
   await redis.set(key, value);
 }
 
-/**
- * Delete a key from Redis.
- */
 export async function del(key: string): Promise<void> {
   await redis.del(key);
 }
@@ -37,3 +28,4 @@ export async function storeAnalysis(id: string, data: any) {
 export async function getAnalysisResult(id: string) {
   return await get(`analysis:${id}`);
 }
+
