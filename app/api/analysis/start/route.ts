@@ -1,7 +1,7 @@
 // app/api/analysis/start/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeDocument } from '@/lib/real-analysis-orchestrator';
+import { analyzeDocument } from '@/lib/real-real-document-processor.ts';
 
 export async function POST(req: NextRequest) {
   try {
