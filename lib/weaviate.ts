@@ -1,51 +1,40 @@
-import weaviate, { WeaviateClient, ApiKey } from 'weaviate-ts-client';
+import weaviate, { WeaviateClient } from 'weaviate-client';
 
-const scheme = process.env.WEAVIATE_SCHEME || 'https';
-const fallbackHost = process.env.WEAVIATE_HOST || process.env.WEAVIATE_FALLBACK_HOST;
-const apiKey = process.env.WEAVIATE_API_KEY;
+const weaviateURL = process.env.WEAVIATE_URL as string;
+const weaviateApiKey = process.env.WEAVIATE_API_KEY as string;
 
-let dynamicHost: string | null = null;
 let client: WeaviateClient | null = null;
 
-/**
- * Initializes the Weaviate client, fetching the dynamic host if needed.
- */
 export async function getWeaviateClient(): Promise<WeaviateClient | null> {
-  if (client && dynamicHost) return client;
+  if (client) return client;
 
-  if (!fallbackHost) {
-    console.warn('[Weaviate] No fallback host configured, cannot initialize client');
+  if (!weaviateURL) {
+    console.warn('[Weaviate] Missing WEAVIATE_URL environment variable');
+    return null;
+  }
+  if (!weaviateApiKey) {
+    console.warn('[Weaviate] Missing WEAVIATE_API_KEY environment variable');
     return null;
   }
 
-  // 1. Connect to fallback host just to fetch meta info
-  const tempClient = weaviate.client({
-    scheme,
-    host: fallbackHost,
-    apiKey: apiKey ? new ApiKey(apiKey) : undefined,
-  });
-
   try {
-    const meta = await tempClient.misc.metaGetter().do();
-    dynamicHost = meta.hostname || fallbackHost;
-
-    // 2. Now connect to the actual dynamic host
-    client = weaviate.client({
-      scheme,
-      host: dynamicHost,
-      apiKey: apiKey ? new ApiKey(apiKey) : undefined,
+    client = await weaviate.connectToWeaviateCloud(weaviateURL, {
+      authCredentials: new weaviate.ApiKey(weaviateApiKey),
     });
+
+    const ready = await client.isReady();
+    if (!ready) {
+      console.warn('[Weaviate] Client not ready');
+      return null;
+    }
 
     return client;
   } catch (error) {
-    console.error('[Weaviate] Failed to get meta and initialize client:', error);
+    console.error('[Weaviate] Failed to connect:', error);
     return null;
   }
 }
 
-/**
- * Fetches the full Weaviate schema.
- */
 export async function getSchema(): Promise<any | null> {
   const client = await getWeaviateClient();
   if (!client) return null;
@@ -59,9 +48,6 @@ export async function getSchema(): Promise<any | null> {
   }
 }
 
-/**
- * Example: Search physics knowledge using the dynamic client.
- */
 export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<any[]> {
   const client = await getWeaviateClient();
   if (!client) return [];
@@ -73,6 +59,7 @@ export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<
       .withNearText({ concepts: [query] })
       .withLimit(limit)
       .do();
+
     return response.data.Get.PhysicsKnowledge || [];
   } catch (error) {
     console.error('[searchPhysicsKnowledge] Weaviate query failed:', error);
