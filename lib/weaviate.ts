@@ -1,38 +1,11 @@
-class Creator {
-  private className: string = ''
-  private properties: any = {}
+import weaviate from "weaviate-ts-client";
 
-  withClassName(name: string) {
-    this.className = name
-    return this
-  }
-
-  withProperties(props: any) {
-    this.properties = props
-    return this
-  }
-
-  async do() {
-    return { id: `mock-id-${Date.now()}` }
-  }
-}
-
-class Data {
-  creator() {
-    return new Creator()
-  }
-}
+const client = weaviate.client({
+  scheme: "https",
+  host: process.env.WEAVIATE_URL?.replace(/^https?:\/\//, "") ?? "",
+  apiKey: process.env.WEAVIATE_API_KEY,
+});
 
 export function getWeaviateClient() {
-  return {
-    data: new Data(),
-    misc: {
-      metaGetter: () => ({
-        async do() {
-          return { status: 'ok' }
-        }
-      })
-    }
-  }
+  return client;
 }
-
