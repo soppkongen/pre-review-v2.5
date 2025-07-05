@@ -1,12 +1,12 @@
 import { RealDocumentProcessor } from '../real-document-processor';
 import { RealOpenAIAgents } from '../real-openai-agents';
-import { storeAnalysis } from '../kv-storage';
+import { AnalysisStorage } from '../kv-storage';
 import { v4 as uuidv4 } from 'uuid';
 
 export class AgentOrchestrator {
   async analyzeDocument(file: File, summary?: string, reviewMode: string = 'full'): Promise<string> {
     const analysisId = uuidv4();
-    await storeAnalysis(analysisId, {
+    await AnalysisStorage.store(analysisId, {
       analysisId,
       documentName: file.name,
       reviewMode,
@@ -25,11 +25,10 @@ export class AgentOrchestrator {
     // Run all AI agents (real OpenAI calls)
     const agentResults = await RealOpenAIAgents.runAllAgents(fullText);
 
-    // Optionally: Save to Weaviate here
-    // const weaviateClient = getWeaviateClient();
-    // await weaviateClient.data.creator()...
+    // Optionally: Search Weaviate for relevant knowledge
+    // const knowledge = await searchPhysicsKnowledge("quantum mechanics");
 
-    await storeAnalysis(analysisId, {
+    await AnalysisStorage.store(analysisId, {
       analysisId,
       documentName: file.name,
       reviewMode,
@@ -40,7 +39,6 @@ export class AgentOrchestrator {
       overallScore: Math.round(agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length * 10),
       confidence: agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length,
       summary: agentResults.map(a => a.findings.join(' ')).join(' '),
-      // ...add more fields as needed
     });
   }
 }
