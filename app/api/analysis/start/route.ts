@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeDocument } from '@/lib/real-document-processor';
+import { AgentOrchestrator } from '@/lib/services/agent-orchestrator';
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -12,8 +12,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const resultId = await analyzeDocument(file, summary, reviewMode);
-    return NextResponse.json({ resultId });
+    const orchestrator = new AgentOrchestrator();
+    const analysisId = await orchestrator.analyzeDocument(file, summary, reviewMode);
+    return NextResponse.json({ analysisId });
   } catch (error) {
     console.error('Analysis error:', error);
     return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
