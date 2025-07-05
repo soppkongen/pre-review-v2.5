@@ -25,12 +25,11 @@ export async function getAnalysisResult(id: string) {
   return await get(`analysis:${id}`);
 }
 
+// The real AnalysisStorage object
 export const AnalysisStorage = {
-  storeAnalysis,
-  getAnalysisResult,
-  // Optionally, you can add get, set, del as well:
-  get,
+  store: storeAnalysis,
+  get: getAnalysisResult,
   set,
+  getRaw: get,
   del,
 };
-
