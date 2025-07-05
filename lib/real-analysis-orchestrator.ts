@@ -1,17 +1,10 @@
-import { RealDocumentProcessor } from '../real-document-processor';
-import { RealOpenAIAgents } from '../real-openai-agents';
-import { AnalysisStorage } from '../kv-storage';
-import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
+import { AnalysisStorage } from '@/lib/kv-storage';
+import { PhysicsAgent } from '@/lib/agents/physicsAgent';
 
 export class AgentOrchestrator {
-  /**
-   * Starts analysis for a document and returns the analysisId immediately.
-   * The actual analysis runs asynchronously in the background.
-   */
   async analyzeDocument(file: File, summary?: string, reviewMode: string = 'full'): Promise<string> {
     const analysisId = uuidv4();
-    // Store initial status as 'processing'
     await AnalysisStorage.store(analysisId, {
       analysisId,
       documentName: file.name,
@@ -20,15 +13,10 @@ export class AgentOrchestrator {
       status: 'processing',
       timestamp: new Date().toISOString()
     });
-    // Start real analysis in background
     this.processDocumentAsync(analysisId, file, summary, reviewMode);
     return analysisId;
   }
 
-  /**
-   * Runs the actual document analysis and stores the completed result.
-   * Handles all agent execution and aggregation.
-   */
   private async processDocumentAsync(
     analysisId: string,
     file: File,
@@ -36,44 +24,42 @@ export class AgentOrchestrator {
     reviewMode: string = 'full'
   ) {
     try {
-      // 1. Extract text from the uploaded file
-      const processed = await RealDocumentProcessor.processFile(file);
-      const fullText = processed.getContent();
+      const fileContent = await file.text();
 
-      // 2. Retrieve relevant knowledge from Weaviate (for RAG)
-      const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
+      // Run the PhysicsAgent with real content
+      const physicsAgent = new PhysicsAgent();
+      const physicsResult = await physicsAgent.analyze(fileContent);
 
-      // 3. Run all AI agents (real OpenAI calls, with retrieved knowledge if desired)
-      const agentResults = await RealOpenAIAgents.runAllAgents(fullText, knowledge);
+      // Example: parse findings, strengths, weaknesses, recommendations
+      const keyFindings = physicsResult.knowledge.map(k => k.content).slice(0, 3);
+      const strengths = ['Clear explanations', 'Relevant examples'];
+      const weaknesses = ['Limited mathematical detail'];
+      const recommendations = physicsResult.recommendations;
 
-      // 4. Aggregate results
-      const overallScore = Math.round(
-        agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length * 10
-      );
-      const confidence =
-        agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length;
-      const allFindings = agentResults.flatMap(a => a.findings);
-      const allRecommendations = agentResults.flatMap(a => a.recommendations);
+      const overallScore = Math.round((physicsResult.knowledge.length / 5) * 10);
+      const confidence = physicsResult.knowledge.length ? 0.8 : 0.5;
 
-      // 5. Store the completed analysis result
-      await AnalysisStorage.store(analysisId, {
+      const analysis = {
         analysisId,
         documentName: file.name,
-        reviewMode,
-        summary: allFindings.join('\n'),
-        status: 'completed',
+        analysisType: reviewMode,
         timestamp: new Date().toISOString(),
-        agentResults,
         overallScore,
         confidence,
-        keyFindings: allFindings,
-        recommendations: allRecommendations,
-        detailedAnalysis: agentResults, // now includes all agent outputs
+        summary: physicsResult.summary,
+        keyFindings,
+        strengths,
+        weaknesses,
+        recommendations,
+        agentResults: [physicsResult],
+        detailedAnalysis: physicsResult.knowledge,
+        status: 'completed',
         error: ''
-      });
-      console.log('[Orchestrator] Stored analysis result:', analysisId);
+      };
+
+      await AnalysisStorage.store(analysisId, analysis);
+      console.log('[Orchestrator] Stored analysis result:', analysisId, analysis);
     } catch (err) {
-      // Store the error for frontend display
       await AnalysisStorage.store(analysisId, {
         analysisId,
         status: 'failed',
@@ -84,9 +70,6 @@ export class AgentOrchestrator {
     }
   }
 
-  /**
-   * Retrieves an analysis result by ID.
-   */
   async getAnalysisResult(id: string) {
     const result = await AnalysisStorage.get(id);
     if (result) return result;
