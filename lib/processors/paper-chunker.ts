@@ -1,4 +1,5 @@
-// lib/processors/paper-chunker.ts
+'use server';
+
 import { encoding_for_model } from "tiktoken";
 
 export interface Chunk {
