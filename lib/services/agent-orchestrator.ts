@@ -5,7 +5,7 @@ import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
 
 export class AgentOrchestrator {
-  /** Starts analysis, stores initial state, and returns analysisId immediately */
+  /** Entry point: store initial status and run analysis to completion */
   async analyzeDocument(
     file: File,
     summary?: string,
@@ -21,15 +21,12 @@ export class AgentOrchestrator {
       timestamp: new Date().toISOString(),
     });
 
-    // Ensure the background job runs before the function exits
-    process.nextTick(() =>
-      this.processDocumentAsync(analysisId, file, summary, reviewMode)
-    );
-
+    // Run the full analysis before returning
+    await this.processDocumentAsync(analysisId, file, summary, reviewMode);
     return analysisId;
   }
 
-  /** Background job: orchestrates RAG, multi-agent analysis, and persistence */
+  /** Orchestrates ingestion, RAG, multi-agent calls, and persistence */
   private async processDocumentAsync(
     analysisId: string,
     file: File,
@@ -42,14 +39,14 @@ export class AgentOrchestrator {
       const processed = await RealDocumentProcessor.processFile(file);
       const fullText = processed.getContent();
 
-      // 2. Optional RAG retrieval
+      // 2. RAG retrieval
       const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
       await AnalysisStorage.store(analysisId, {
         status: 'running',
         timestamp: new Date().toISOString(),
       });
 
-      // 3. Run agents in parallel with instrumentation
+      // 3. Run each agent with instrumentation
       const agentPromises = RealOpenAIAgents.agentIds().map(async (agentId) => {
         console.log(`Starting agent ${agentId} at ${new Date().toISOString()}`);
         const res = await RealOpenAIAgents.runAgent(agentId, {
@@ -67,15 +64,14 @@ export class AgentOrchestrator {
       const agentResults = await Promise.all(agentPromises);
       const totalDurationMs = Date.now() - startAll;
 
-      // 4. Aggregate analytics
+      // 4. Aggregate metrics
       const confidences = agentResults.map(a => a.confidence);
-      const avgConfidence =
-        confidences.reduce((s, c) => s + c, 0) / confidences.length;
+      const avgConfidence = confidences.reduce((s, c) => s + c, 0) / confidences.length;
       const overallScore = Math.round(avgConfidence * 100) / 10;
       const allFindings = agentResults.flatMap(a => a.findings);
       const allRecommendations = agentResults.flatMap(a => a.recommendations);
 
-      // 5. Persist final results
+      // 5. Final persistence
       await AnalysisStorage.store(analysisId, {
         analysisId,
         documentName: file.name,
