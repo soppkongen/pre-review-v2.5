@@ -12,9 +12,15 @@ export async function enqueueJob(job) {
 }
 export async function dequeueJob() {
     const res = await redis.lpop(JOB_QUEUE_KEY);
-    if (!res)
+    if (!res || typeof res !== 'string' || !res.trim().startsWith('{'))
         return null;
-    return JSON.parse(res);
+    try {
+        return JSON.parse(res);
+    }
+    catch (e) {
+        console.error('Failed to parse job from Redis:', res, e);
+        return null;
+    }
 }
 export async function setJobStatus(jobId, status) {
     await redis.set(JOB_STATUS_PREFIX + jobId, status);
