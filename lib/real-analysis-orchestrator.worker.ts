@@ -1,6 +1,6 @@
 import { RealDocumentProcessor, ProcessedDocument } from './real-document-processor.worker.js';
-import { PhysicsAgent } from './agents/physicsAgent';
-import { OpenAIRateLimiter } from './ai/rate-limiter';
+import { PhysicsAgent } from './agents/physicsAgent.worker.js';
+import { OpenAIRateLimiter } from './ai/rate-limiter.js';
 
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 1 });
 
@@ -23,4 +23,4 @@ export class RealAnalysisOrchestrator {
 
     return { analysis, metadata: processed.metadata, timings: results.map(r => ({ chunkId: r.chunkId, durationMs: r.durationMs })) };
   }
-}
+} 
