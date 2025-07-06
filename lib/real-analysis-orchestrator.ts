@@ -3,36 +3,36 @@ import { PhysicsAgent } from '@/lib/agents/physics-agent';
 import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
 import { PaperChunker } from '@/lib/processors/paper-chunker';
 
-const rateLimiter = new OpenAIRateLimiter();
+const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 1000, concurrency: 2 });
 const chunker = new PaperChunker();
 
 export class RealAnalysisOrchestrator {
+  /** Orchestrates chunked physics analysis with timing instrumentation */
   async processDocumentAsync(file: File) {
-    // Step 1: Process file into chunks
     const processed: ProcessedDocument = await RealDocumentProcessor.processFile(file);
     const chunks = processed.chunks;
-
-    // Step 2: Analyze each chunk in sequence (rate-limited)
     const physicsAgent = new PhysicsAgent();
-    const results: Array<{ chunkId: number; result: any }> = [];
+
+    const results: Array<{ chunkId: number; result: any; durationMs: number }> = [];
 
     for (const { id, content } of chunks) {
+      const start = Date.now();
       const physicsResult = await rateLimiter.schedule(() =>
         physicsAgent.analyze(content)
       );
-      results.push({ chunkId: id, result: physicsResult });
+      const durationMs = Date.now() - start;
+      results.push({ chunkId: id, result: physicsResult, durationMs });
     }
 
-    // Step 3: Aggregate results
     const aggregated = results
       .sort((a, b) => a.chunkId - b.chunkId)
-      .map(r => r.result)
+      .map(r => `[Chunk ${r.chunkId} - ${r.durationMs}ms]\n${r.result}`)
       .join('\n\n');
 
-    // Return full analysis text along with metadata
     return {
       analysis: aggregated,
       metadata: processed.metadata,
+      timings: results.map(r => ({ chunkId: r.chunkId, durationMs: r.durationMs })),
     };
   }
 }
