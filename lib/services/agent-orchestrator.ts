@@ -5,7 +5,12 @@ import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
 
 export class AgentOrchestrator {
-  async analyzeDocument(file: File, summary?: string, reviewMode: string = 'full'): Promise<string> {
+  /** Starts analysis, stores initial state, and returns analysisId immediately */
+  async analyzeDocument(
+    file: File,
+    summary?: string,
+    reviewMode: string = 'full'
+  ): Promise<string> {
     const analysisId = uuidv4();
     await AnalysisStorage.store(analysisId, {
       analysisId,
@@ -13,30 +18,46 @@ export class AgentOrchestrator {
       reviewMode,
       summary,
       status: 'processing',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    // Start real analysis in background
+
+    // Fire-and-forget background processing
     this.processDocumentAsync(analysisId, file, summary, reviewMode);
     return analysisId;
   }
 
-  private async processDocumentAsync(analysisId: string, file: File, summary?: string, reviewMode: string = 'full') {
+  /** Background job: orchestrates RAG, multi-agent analysis, and persistence */
+  private async processDocumentAsync(
+    analysisId: string,
+    file: File,
+    summary?: string,
+    reviewMode: string = 'full'
+  ) {
     try {
+      // 1. Ingest & chunk
       const processed = await RealDocumentProcessor.processFile(file);
       const fullText = processed.getContent();
 
-      // Retrieve relevant knowledge from Weaviate (optional, for RAG)
+      // 2. Optional RAG retrieval
       const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
 
-      // Run all AI agents (real OpenAI calls, with retrieved knowledge if desired)
-      const agentResults = await RealOpenAIAgents.runAllAgents(fullText);
+      // 3. Run agents in parallel with rate limiting
+      const startAll = Date.now();
+      const agentResults = await RealOpenAIAgents.runAllAgents({
+        text: fullText,
+        context: knowledge,
+      });
+      const totalDurationMs = Date.now() - startAll;
 
-      // Aggregate results
-      const overallScore = Math.round(agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length * 10);
-      const confidence = agentResults.reduce((sum, a) => sum + a.confidence, 0) / agentResults.length;
+      // 4. Aggregate analytics
+      const confidences = agentResults.map(a => a.confidence);
+      const averageConfidence =
+        confidences.reduce((s, c) => s + c, 0) / confidences.length;
+      const overallScore = Math.round(averageConfidence * 100) / 10;
       const allFindings = agentResults.flatMap(a => a.findings);
       const allRecommendations = agentResults.flatMap(a => a.recommendations);
 
+      // 5. Persist final results
       await AnalysisStorage.store(analysisId, {
         analysisId,
         documentName: file.name,
@@ -46,18 +67,22 @@ export class AgentOrchestrator {
         timestamp: new Date().toISOString(),
         agentResults,
         overallScore,
-        confidence,
+        confidence: averageConfidence,
         keyFindings: allFindings,
         recommendations: allRecommendations,
-        detailedAnalysis: {}, // Fill in with more agent outputs as needed
-        error: ''
+        detailedAnalysis: agentResults.reduce((acc, a) => {
+          acc[a.agentName] = { findings: a.findings, recommendations: a.recommendations };
+          return acc;
+        }, {} as Record<string, any>),
+        timings: { totalDurationMs },
+        error: '',
       });
     } catch (err) {
       await AnalysisStorage.store(analysisId, {
         analysisId,
         status: 'failed',
         error: (err as Error).message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
