@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
 
-// Rate limiter with 1s minimum interval and up to 2 concurrent calls
-const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 1000, concurrency: 2 });
+// Limit to 1 call per 6s and max 2 concurrent calls to stay under TPM
+const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 2 });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export interface AgentResult {
@@ -16,22 +16,26 @@ export interface AgentResult {
 
 async function callOpenAI(
   role: string,
-  prompt: string
+  prompt: string,
+  maxTokens = 500
 ): Promise<{ text: string; durationMs: number }> {
   const start = Date.now();
   const completion = await rateLimiter.schedule(() =>
     openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4-turbo-128k',
       messages: [
         { role: 'system', content: `You are a ${role}.` },
         { role: 'user', content: prompt }
       ],
       temperature: 0.3,
-      max_tokens: 1500,
+      max_tokens: maxTokens,
     })
   );
   const durationMs = Date.now() - start;
-  return { text: completion.choices[0].message.content.trim(), durationMs };
+  return {
+    text: completion.choices[0].message.content.trim(),
+    durationMs,
+  };
 }
 
 export const RealOpenAIAgents = {
@@ -40,7 +44,7 @@ export const RealOpenAIAgents = {
       "Provide a **theoretical** analysis of the paper.",
       opts.context ? `Context:\n${opts.context.join('\n')}` : '',
       `Content:\n${opts.text}`,
-      "Output JSON with fields: observations[], strengths[], weaknesses[], recommendations[]."
+      "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
 
     const { text, durationMs } = await callOpenAI("theoretical physicist", prompt);
@@ -59,7 +63,7 @@ export const RealOpenAIAgents = {
       "Analyze the **mathematical** soundness and rigor.",
       opts.context ? `Context:\n${opts.context.join('\n')}` : '',
       `Content:\n${opts.text}`,
-      "Output JSON with fields: observations[], strengths[], weaknesses[], recommendations[]."
+      "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
 
     const { text, durationMs } = await callOpenAI("mathematician", prompt);
@@ -78,7 +82,7 @@ export const RealOpenAIAgents = {
       "Evaluate the **epistemic** quality and reliability.",
       opts.context ? `Context:\n${opts.context.join('\n')}` : '',
       `Content:\n${opts.text}`,
-      "Output JSON with fields: observations[], strengths[], weaknesses[], recommendations[]."
+      "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
 
     const { text, durationMs } = await callOpenAI("epistemic reviewer", prompt);
@@ -100,12 +104,14 @@ export const RealOpenAIAgents = {
     ]);
   },
 
-  // Helpers for instrumentation
   agentIds(): string[] {
     return ['theoretical', 'mathematical', 'epistemic'];
   },
 
-  async runAgent(agentId: string, opts: { text: string; context?: string[] }): Promise<AgentResult> {
+  async runAgent(
+    agentId: string,
+    opts: { text: string; context?: string[] }
+  ): Promise<AgentResult> {
     switch (agentId) {
       case 'theoretical':
         return this.theoreticalAgent(opts);
