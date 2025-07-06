@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
           controller.close()
           isCompleted = true
         }
-      }, 180000) // 3 minute timeout (reduced from 5)
+      }, 180000) // 3 minute timeout
 
       try {
         const orchestrator = new AgentOrchestrator()
@@ -46,9 +46,10 @@ export async function GET(request: NextRequest) {
           ),
         )
 
-        // Process each agent sequentially to avoid overwhelming the system
+        // Process each agent strictly one after the other
         for (let i = 0; i < agents.length && !isCompleted; i++) {
           const agent = agents[i]
+          const agentStart = Date.now();
 
           try {
             // Send progress update
@@ -63,19 +64,13 @@ export async function GET(request: NextRequest) {
               ),
             )
 
-            // Add timeout for individual agent analysis (reduced to 45 seconds)
-            const agentTimeout = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error("Agent timeout")), 45000)
-            })
-
-            const analysisPromise = orchestrator.analyzeWithAgent(agent.id, paperContent, paperTitle)
-            
-            const result = await Promise.race([analysisPromise, agentTimeout])
+            // Wait for agent analysis to fully complete before starting next
+            const result = await orchestrator.analyzeWithAgent(agent.id, paperContent, paperTitle)
 
             if (!isCompleted) {
               // Send agent result in smaller chunks to prevent large payloads
               const resultText = typeof result === 'string' ? result : result.analysis || 'Analysis completed'
-              const chunks = resultText.match(/.{1,300}/g) || [resultText] // Reduced chunk size
+              const chunks = resultText.match(/.{1,300}/g) || [resultText]
               
               for (const chunk of chunks) {
                 if (!isCompleted) {
@@ -100,6 +95,7 @@ export async function GET(request: NextRequest) {
                     type: "agent-complete",
                     agentId: agent.id,
                     agentName: agent.name,
+                    durationMs: Date.now() - agentStart
                   })}\n\n`,
                 ),
               )
@@ -117,6 +113,11 @@ export async function GET(request: NextRequest) {
                 ),
               )
             }
+          }
+
+          // Wait 500ms between agents to avoid rate limits and give time for each analysis
+          if (i < agents.length - 1 && !isCompleted) {
+            await new Promise(resolve => setTimeout(resolve, 500))
           }
         }
 
