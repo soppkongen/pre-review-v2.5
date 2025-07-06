@@ -21,8 +21,11 @@ export class AgentOrchestrator {
       timestamp: new Date().toISOString(),
     });
 
-    // Fire-and-forget background processing
-    this.processDocumentAsync(analysisId, file, summary, reviewMode);
+    // Ensure the background job runs before the function exits
+    process.nextTick(() =>
+      this.processDocumentAsync(analysisId, file, summary, reviewMode)
+    );
+
     return analysisId;
   }
 
@@ -33,6 +36,7 @@ export class AgentOrchestrator {
     summary?: string,
     reviewMode: string = 'full'
   ) {
+    const startAll = Date.now();
     try {
       // 1. Ingest & chunk
       const processed = await RealDocumentProcessor.processFile(file);
@@ -40,20 +44,34 @@ export class AgentOrchestrator {
 
       // 2. Optional RAG retrieval
       const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
-
-      // 3. Run agents in parallel with rate limiting
-      const startAll = Date.now();
-      const agentResults = await RealOpenAIAgents.runAllAgents({
-        text: fullText,
-        context: knowledge,
+      await AnalysisStorage.store(analysisId, {
+        status: 'running',
+        timestamp: new Date().toISOString(),
       });
+
+      // 3. Run agents in parallel with instrumentation
+      const agentPromises = RealOpenAIAgents.agentIds().map(async (agentId) => {
+        console.log(`Starting agent ${agentId} at ${new Date().toISOString()}`);
+        const res = await RealOpenAIAgents.runAgent(agentId, {
+          text: fullText,
+          context: knowledge,
+        });
+        console.log(`Agent ${agentId} completed in ${res.durationMs}ms`);
+        await AnalysisStorage.store(analysisId, {
+          [`${agentId}Result`]: res,
+          timestamp: new Date().toISOString(),
+        });
+        return res;
+      });
+
+      const agentResults = await Promise.all(agentPromises);
       const totalDurationMs = Date.now() - startAll;
 
       // 4. Aggregate analytics
       const confidences = agentResults.map(a => a.confidence);
-      const averageConfidence =
+      const avgConfidence =
         confidences.reduce((s, c) => s + c, 0) / confidences.length;
-      const overallScore = Math.round(averageConfidence * 100) / 10;
+      const overallScore = Math.round(avgConfidence * 100) / 10;
       const allFindings = agentResults.flatMap(a => a.findings);
       const allRecommendations = agentResults.flatMap(a => a.recommendations);
 
@@ -67,7 +85,7 @@ export class AgentOrchestrator {
         timestamp: new Date().toISOString(),
         agentResults,
         overallScore,
-        confidence: averageConfidence,
+        confidence: avgConfidence,
         keyFindings: allFindings,
         recommendations: allRecommendations,
         detailedAnalysis: agentResults.reduce((acc, a) => {
@@ -76,6 +94,7 @@ export class AgentOrchestrator {
         }, {} as Record<string, any>),
         timings: { totalDurationMs },
         error: '',
+        timestamps: { started: startAll, finished: Date.now() },
       });
     } catch (err) {
       await AnalysisStorage.store(analysisId, {
