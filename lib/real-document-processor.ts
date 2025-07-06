@@ -1,15 +1,34 @@
+import { PaperChunker, Chunk } from '@/lib/processors/paper-chunker';
+
+export interface ProcessedDocument {
+  chunks: Chunk[];
+  metadata: {
+    fileType: string;
+    fileName: string;
+  };
+  getContent: () => string;
+  getTitle: () => string;
+  getSupportedFileTypes: () => string[];
+  getMaxFileSize: () => number;
+}
+
+const chunker = new PaperChunker();
+
 export const RealDocumentProcessor = {
-  async processFile(file: File) {
+  async processFile(file: File): Promise<ProcessedDocument> {
     const text = await file.text();
-    // Here you can add PDF/Docx parsing, chunking, etc.
+    const chunks = chunker.chunkText(text);
+
     return {
-      chunks: [text],
-      metadata: { fileType: file.type, fileName: file.name },
+      chunks,
+      metadata: {
+        fileType: file.type,
+        fileName: file.name,
+      },
       getContent: () => text,
       getTitle: () => file.name,
-      getSupportedFileTypes: () => ['pdf', 'txt'],
-      getMaxFileSize: () => 10 * 1024 * 1024,
+      getSupportedFileTypes: () => ['pdf', 'txt', 'docx'],
+      getMaxFileSize: () => 10 * 1024 * 1024, // 10 MB
     };
   },
-  // Add more helper methods as needed
 };
