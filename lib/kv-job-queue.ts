@@ -25,8 +25,13 @@ export async function enqueueJob(job: AnalysisJob) {
 
 export async function dequeueJob(): Promise<AnalysisJob | null> {
   const res = await redis.lpop(JOB_QUEUE_KEY);
-  if (!res) return null;
-  return JSON.parse(res as string) as AnalysisJob;
+  if (!res || typeof res !== 'string' || !res.trim().startsWith('{')) return null;
+  try {
+    return JSON.parse(res) as AnalysisJob;
+  } catch (e) {
+    console.error('Failed to parse job from Redis:', res, e);
+    return null;
+  }
 }
 
 export async function setJobStatus(jobId: string, status: JobStatus) {
