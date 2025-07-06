@@ -3,12 +3,13 @@ import { getAnalysisResult } from '@/lib/kv-storage'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log(`[API] GET /api/analysis/${params.id} - Request received`)
+  const { id } = await params;
+  console.log(`[API] GET /api/analysis/${id} - Request received`)
   
   try {
-    const result = await getAnalysisResult(params.id)
+    const result = await getAnalysisResult(id)
     console.log(`[API] Retrieved result:`, {
       status: result?.status,
       agentCount: result?.agentResults?.length ?? 0,

@@ -73,6 +73,18 @@ export default function KnowledgeBasePage() {
     const getDifficultyColor = (difficulty) => {
         switch (difficulty) {
             case "introductory":
+                return "default";
+            case "intermediate":
+                return "secondary";
+            case "advanced":
+                return "destructive";
+            default:
+                return "outline";
+        }
+    };
+    const getDifficultyClassName = (difficulty) => {
+        switch (difficulty) {
+            case "introductory":
                 return "bg-green-100 text-green-800";
             case "intermediate":
                 return "bg-yellow-100 text-yellow-800";
@@ -239,7 +251,7 @@ export default function KnowledgeBasePage() {
                     {searchResults.map((result, index) => (<Card key={result.id || index} className="p-4">
                         <div className="flex justify-between items-start mb-2">
                           <Badge variant="secondary">{result.domain}</Badge>
-                          <Badge variant={getDifficultyColor(result.difficulty)}>{result.difficulty}</Badge>
+                          <Badge variant={getDifficultyColor(result.difficulty)} className={getDifficultyClassName(result.difficulty)}>{result.difficulty}</Badge>
                         </div>
                         <p className="text-sm text-gray-600 mb-2">{result.contentType}</p>
                         <p className="mb-3">{result.content.substring(0, 300)}...</p>

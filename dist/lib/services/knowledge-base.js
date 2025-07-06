@@ -8,4 +8,12 @@ export class KnowledgeBaseService {
     async addKnowledge(entry) {
         return `mock-id-${Date.now()}`;
     }
+    // Robust: always return a valid stats structure
+    async getKnowledgeStats() {
+        return {
+            totalConcepts: 0,
+            fieldDistribution: {},
+            difficultyDistribution: {},
+        };
+    }
 }

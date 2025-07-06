@@ -96,7 +96,7 @@ export class AgentOrchestrator {
       await AnalysisStorage.store(analysisId, { status: 'running', timestamp: new Date().toISOString() });
 
       // 3. Tokenizer for chunking
-      const enc = encodingForModel(TOKEN_MODEL);
+      const enc = encodingForModel(TOKEN_MODEL as any);
       const tokenIds = enc.encode(fullText);
       const rawChunks: string[] = [];
       for (let i = 0; i < tokenIds.length; i += MAX_INPUT_TOKENS) {

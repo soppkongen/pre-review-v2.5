@@ -42,7 +42,7 @@ export class OpenAIRateLimiter {
     resolve: (value: T) => void,
     reject: (err: any) => void,
     attempt = 1
-  ) {
+  ): Promise<void> {
     const now = Date.now();
     const wait = Math.max(0, this.minIntervalMs - (now - this.lastRequestTimestamp));
     if (wait > 0) await new Promise(r => setTimeout(r, wait));

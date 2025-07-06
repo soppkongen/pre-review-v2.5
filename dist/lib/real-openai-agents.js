@@ -14,7 +14,7 @@ async function callOpenAI(role, prompt, model, maxTokens) {
         temperature: 0.3,
         max_tokens: maxTokens,
     }));
-    return { text: res.choices[0].message.content.trim(), durationMs: Date.now() - t0 };
+    return { text: res.choices[0]?.message?.content?.trim() || '', durationMs: Date.now() - t0 };
 }
 export const RealOpenAIAgents = {
     async summarizeChunk(text, model = MODEL, maxTokens) {

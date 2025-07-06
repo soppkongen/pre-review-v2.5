@@ -46,7 +46,7 @@ export async function GET(request) {
                         const result = await orchestrator.analyzeWithAgent(agent.id, paperContent, paperTitle);
                         if (!isCompleted) {
                             // Send agent result in smaller chunks to prevent large payloads
-                            const resultText = typeof result === 'string' ? result : result.analysis || 'Analysis completed';
+                            const resultText = typeof result === 'string' ? result : 'Analysis completed';
                             const chunks = resultText.match(/.{1,300}/g) || [resultText];
                             for (const chunk of chunks) {
                                 if (!isCompleted) {

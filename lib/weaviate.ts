@@ -46,7 +46,7 @@ export async function getSchema(): Promise<any | null> {
   if (!client) return null;
 
   try {
-    const schema = await client.schema.getter().do();
+    const schema = await (client as any).schema.getter().do();
     return schema;
   } catch (error) {
     console.error('[Weaviate] Failed to get schema:', error);
@@ -62,7 +62,7 @@ export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<
   if (!client) return [];
 
   try {
-    const response = await client.graphql.get()
+    const response = await (client as any).graphql.get()
       .withClassName('PhysicsChunk')
       .withFields(`
         chunkId

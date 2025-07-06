@@ -13,7 +13,9 @@ export async function GET() {
     };
     try {
         // Check Weaviate connection
-        const client = getWeaviateClient();
+        const client = await getWeaviateClient();
+        if (!client)
+            throw new Error("Weaviate client not available");
         await client.misc.metaGetter().do();
         health.services.weaviate = "healthy";
     }

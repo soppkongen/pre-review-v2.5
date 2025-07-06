@@ -32,7 +32,7 @@ async function callOpenAI(
       max_tokens: maxTokens,
     })
   );
-  return { text: res.choices[0].message.content.trim(), durationMs: Date.now() - t0 };
+  return { text: res.choices[0]?.message?.content?.trim() || '', durationMs: Date.now() - t0 };
 }
 
 export const RealOpenAIAgents = {

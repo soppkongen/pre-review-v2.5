@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
+import { clsx } from "clsx";
 import { cn } from "@/lib/utils";
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" };
@@ -90,12 +91,12 @@ const ChartTooltipContent = React.forwardRef(({ active, payload, className, indi
             const indicatorColor = color || item.payload.fill || item.color;
             return (<div key={item.dataKey} className={cn("flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground", indicator === "dot" && "items-center")}>
                 {formatter && item?.value !== undefined && item.name ? (formatter(item.value, item.name, item, index, item.payload)) : (<>
-                    {itemConfig?.icon ? (<itemConfig.icon />) : (!hideIndicator && (<div className={cn("shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]", {
+                    {itemConfig?.icon ? (<itemConfig.icon />) : (!hideIndicator && (<div className={cn("shrink-0 rounded-[2px] border-[--color-border] bg-[--color-bg]", clsx({
                             "h-2.5 w-2.5": indicator === "dot",
                             "w-1": indicator === "line",
                             "w-0 border-[1.5px] border-dashed bg-transparent": indicator === "dashed",
                             "my-0.5": nestLabel && indicator === "dashed",
-                        })} style={{
+                        }))} style={{
                             "--color-bg": indicatorColor,
                             "--color-border": indicatorColor,
                         }}/>))}
