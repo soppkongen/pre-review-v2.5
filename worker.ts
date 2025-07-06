@@ -1,8 +1,7 @@
-// worker.ts
-import { dequeueJob, setJobStatus, setJobResult } from './dist/lib/kv-job-queue.js';
-import { AgentOrchestrator } from './dist/lib/services/agent-orchestrator.js';
+import { dequeueJob, setJobStatus, setJobResult } from './lib/kv-job-queue';
+import { AgentOrchestrator } from './lib/services/agent-orchestrator';
 
-async function processJob(job) {
+async function processJob(job: any) {
   console.log(`[Worker] Processing job ${job.id}...`);
   await setJobStatus(job.id, 'running');
   try {
