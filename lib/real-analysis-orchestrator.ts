@@ -5,7 +5,6 @@ import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 1 });
 
 export class RealAnalysisOrchestrator {
-  /** Chunked physics analysis with timing instrumentation */
   async processDocumentAsync(file: File) {
     const processed: ProcessedDocument = await RealDocumentProcessor.processFile(file);
     const physicsAgent = new PhysicsAgent();
