@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { initializeWeaviateSchema, searchPhysicsKnowledge } from '@/lib/weaviate'
+import { searchPhysicsKnowledge } from '@/lib/weaviate'
 import { RealOpenAIAgents } from '@/lib/real-openai-agents'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(request: NextRequest) {
   try {
-    // Initialize Weaviate schema if needed
-    await initializeWeaviateSchema()
-    
     const body = await request.json()
     const { message, conversationId, analysisType = 'theory_development' } = body
     
@@ -21,20 +18,33 @@ export async function POST(request: NextRequest) {
     // Search for relevant physics knowledge
     const relevantKnowledge = await searchPhysicsKnowledge(message, 8)
     
-    // Use real OpenAI agent for theory lab chat
-    const analysisResult = await RealOpenAIAgents.theoryLabChat(message, relevantKnowledge)
+    // Use the theoretical agent for theory lab chat
+    const analysisResult = await RealOpenAIAgents.theoreticalAgent({ 
+      text: message, 
+      context: relevantKnowledge.map(k => k.content) 
+    })
     
     // Format response for chat interface
     const response = {
       id: uuidv4(),
       role: 'assistant',
-      content: analysisResult.response,
+      content: [
+        '**Analysis Results:**',
+        '',
+        '**Key Findings:**',
+        ...analysisResult.findings.map(f => `- ${f}`),
+        '',
+        '**Recommendations:**',
+        ...analysisResult.recommendations.map(r => `- ${r}`),
+        '',
+        `*Confidence: ${Math.round(analysisResult.confidence * 100)}%*`
+      ].join('\n'),
       agent: 'Research Coordinator',
       timestamp: new Date(),
       metadata: {
         confidence: analysisResult.confidence,
         relevantSources: relevantKnowledge.length,
-        domains: analysisResult.domains
+        domains: ['physics', 'theory']
       }
     }
     
@@ -43,7 +53,7 @@ export async function POST(request: NextRequest) {
       response,
       analysisDetails: {
         relevantKnowledge: relevantKnowledge.length,
-        domains: analysisResult.domains,
+        domains: ['physics', 'theory'],
         confidence: analysisResult.confidence
       }
     })

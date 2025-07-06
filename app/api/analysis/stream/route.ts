@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
           controller.close()
           isCompleted = true
         }
-      }, 300000) // 5 minute timeout
+      }, 180000) // 3 minute timeout (reduced from 5)
 
       try {
         const orchestrator = new AgentOrchestrator()
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
           ),
         )
 
-        // Process each agent with error handling
+        // Process each agent sequentially to avoid overwhelming the system
         for (let i = 0; i < agents.length && !isCompleted; i++) {
           const agent = agents[i]
 
@@ -63,9 +63,9 @@ export async function GET(request: NextRequest) {
               ),
             )
 
-            // Add timeout for individual agent analysis
+            // Add timeout for individual agent analysis (reduced to 45 seconds)
             const agentTimeout = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error("Agent timeout")), 60000) // 1 minute per agent
+              setTimeout(() => reject(new Error("Agent timeout")), 45000)
             })
 
             const analysisPromise = orchestrator.analyzeWithAgent(agent.id, paperContent, paperTitle)
@@ -73,9 +73,9 @@ export async function GET(request: NextRequest) {
             const result = await Promise.race([analysisPromise, agentTimeout])
 
             if (!isCompleted) {
-              // Send agent result in chunks to prevent large payloads
+              // Send agent result in smaller chunks to prevent large payloads
               const resultText = typeof result === 'string' ? result : result.analysis || 'Analysis completed'
-              const chunks = resultText.match(/.{1,500}/g) || [resultText]
+              const chunks = resultText.match(/.{1,300}/g) || [resultText] // Reduced chunk size
               
               for (const chunk of chunks) {
                 if (!isCompleted) {
@@ -89,6 +89,8 @@ export async function GET(request: NextRequest) {
                       })}\n\n`,
                     ),
                   )
+                  // Small delay between chunks to prevent overwhelming
+                  await new Promise(resolve => setTimeout(resolve, 50))
                 }
               }
 

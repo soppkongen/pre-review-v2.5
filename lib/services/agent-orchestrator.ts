@@ -10,7 +10,54 @@ const MAX_INPUT_TOKENS = 5000;    // tokens per chunk
 const SUMMARY_MODEL = 'gpt-3.5-turbo-16k';
 const SUMMARY_TOKENS = 300;
 
+export interface Agent {
+  id: string;
+  name: string;
+  role: string;
+  confidence: number;
+}
+
 export class AgentOrchestrator {
+  // Add the missing methods for streaming
+  getAgents(): Agent[] {
+    return [
+      { id: 'theoretical', name: 'Theoretical Physicist', role: 'Theory', confidence: 0.9 },
+      { id: 'mathematical', name: 'Mathematical Analyst', role: 'Mathematics', confidence: 0.85 },
+      { id: 'epistemic', name: 'Epistemic Reviewer', role: 'Epistemics', confidence: 0.8 },
+    ];
+  }
+
+  async analyzeWithAgent(agentId: string, paperContent: string, paperTitle: string): Promise<string> {
+    try {
+      // Get knowledge context
+      const knowledge = await searchPhysicsKnowledge(paperContent.slice(0, 200), 3);
+      
+      // Run the specific agent
+      const result = await RealOpenAIAgents.runAgent(agentId, { 
+        text: paperContent, 
+        context: knowledge.map(k => k.content) 
+      });
+      
+      // Format the result for streaming
+      const analysis = [
+        `## ${result.agentName} Analysis`,
+        '',
+        '**Key Findings:**',
+        ...result.findings.map(f => `- ${f}`),
+        '',
+        '**Recommendations:**',
+        ...result.recommendations.map(r => `- ${r}`),
+        '',
+        `*Confidence: ${Math.round(result.confidence * 100)}%*`
+      ].join('\n');
+      
+      return analysis;
+    } catch (error) {
+      console.error(`Agent ${agentId} analysis failed:`, error);
+      return `Analysis failed for ${agentId}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+
   async analyzeDocument(
     file: File,
     summary?: string,

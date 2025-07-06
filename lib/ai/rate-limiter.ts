@@ -1,12 +1,22 @@
 // lib/ai/rate-limiter.ts
 
+interface RateLimiterConfig {
+  minIntervalMs?: number;
+  concurrency?: number;
+  maxRetries?: number;
+}
+
 export class OpenAIRateLimiter {
   private queue: Array<() => void> = [];
   private processing = false;
   private lastRequestTimestamp = 0;
-  private readonly minIntervalMs = 1000; // 1 request per second
+  private readonly minIntervalMs: number;
+  private readonly maxRetries: number;
 
-  constructor(private maxRetries = 3) {}
+  constructor(config: RateLimiterConfig = {}) {
+    this.minIntervalMs = config.minIntervalMs || 2000; // 2 seconds between requests
+    this.maxRetries = config.maxRetries || 2; // Reduced retries
+  }
 
   async schedule<T>(fn: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -43,8 +53,8 @@ export class OpenAIRateLimiter {
       resolve(result);
     } catch (err: any) {
       if (err.status === 429 && attempt <= this.maxRetries) {
-        // exponential backoff
-        const backoff = Math.min(1000 * 2 ** (attempt - 1), 16000);
+        // exponential backoff with shorter delays
+        const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000);
         await new Promise(r => setTimeout(r, backoff));
         return this.execute(fn, resolve, reject, attempt + 1);
       }
