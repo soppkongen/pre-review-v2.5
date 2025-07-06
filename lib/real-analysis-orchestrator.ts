@@ -1,21 +1,18 @@
 import { RealDocumentProcessor, ProcessedDocument } from '@/lib/real-document-processor';
 import { PhysicsAgent } from '@/lib/agents/physics-agent';
 import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
-import { PaperChunker } from '@/lib/processors/paper-chunker';
 
-const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 1000, concurrency: 2 });
-const chunker = new PaperChunker();
+const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 2 });
 
 export class RealAnalysisOrchestrator {
-  /** Orchestrates chunked physics analysis with timing instrumentation */
+  /** Chunked physics analysis with timing instrumentation */
   async processDocumentAsync(file: File) {
     const processed: ProcessedDocument = await RealDocumentProcessor.processFile(file);
-    const chunks = processed.chunks;
     const physicsAgent = new PhysicsAgent();
 
     const results: Array<{ chunkId: number; result: any; durationMs: number }> = [];
 
-    for (const { id, content } of chunks) {
+    for (const { id, content } of processed.chunks) {
       const start = Date.now();
       const physicsResult = await rateLimiter.schedule(() =>
         physicsAgent.analyze(content)
