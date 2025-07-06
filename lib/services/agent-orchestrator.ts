@@ -5,9 +5,10 @@ import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
 import { encodingForModel } from 'js-tiktoken';
 
-const TOKEN_MODEL = 'gpt-4-turbo';
+const MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+const TOKEN_MODEL = MODEL;
 const MAX_INPUT_TOKENS = 5000;    // tokens per chunk
-const SUMMARY_MODEL = 'gpt-3.5-turbo-16k';
+const SUMMARY_MODEL = MODEL;
 const SUMMARY_TOKENS = 300;
 
 export interface Agent {

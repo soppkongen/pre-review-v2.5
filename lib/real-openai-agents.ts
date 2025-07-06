@@ -3,6 +3,7 @@ import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
 
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 3000, concurrency: 1, maxRetries: 2 });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 
 export interface AgentResult {
   agentName: string;
@@ -35,7 +36,7 @@ async function callOpenAI(
 }
 
 export const RealOpenAIAgents = {
-  async summarizeChunk(text: string, model: string, maxTokens: number): Promise<{ text: string }> {
+  async summarizeChunk(text: string, model: string = MODEL, maxTokens: number): Promise<{ text: string }> {
     const prompt = `Summarize this text in up to ${maxTokens} tokens:\n\n${text}`;
     const { text: sum } = await callOpenAI('summarizer', prompt, model, maxTokens);
     return { text: sum };
@@ -48,7 +49,7 @@ export const RealOpenAIAgents = {
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
-    const { text, durationMs } = await callOpenAI('theoretical physicist', prompt, 'gpt-4-turbo', 250);
+    const { text, durationMs } = await callOpenAI('theoretical physicist', prompt, MODEL, 250);
     return { agentName: "Theoretical Physicist", role: "Theory", confidence: 0.9, ...JSON.parse(text), durationMs };
   },
 
@@ -59,7 +60,7 @@ export const RealOpenAIAgents = {
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
-    const { text, durationMs } = await callOpenAI('mathematician', prompt, 'gpt-4-turbo', 250);
+    const { text, durationMs } = await callOpenAI('mathematician', prompt, MODEL, 250);
     return { agentName: "Mathematical Analyst", role: "Mathematics", confidence: 0.85, ...JSON.parse(text), durationMs };
   },
 
@@ -70,7 +71,7 @@ export const RealOpenAIAgents = {
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
-    const { text, durationMs } = await callOpenAI('epistemic reviewer', prompt, 'gpt-4-turbo', 250);
+    const { text, durationMs } = await callOpenAI('epistemic reviewer', prompt, MODEL, 250);
     return { agentName: "Epistemic Reviewer", role: "Epistemics", confidence: 0.8, ...JSON.parse(text), durationMs };
   },
 
