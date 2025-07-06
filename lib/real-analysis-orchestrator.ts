@@ -8,26 +8,19 @@ export class RealAnalysisOrchestrator {
   async processDocumentAsync(file: File) {
     const processed: ProcessedDocument = await RealDocumentProcessor.processFile(file);
     const physicsAgent = new PhysicsAgent();
-
     const results: Array<{ chunkId: number; result: any; durationMs: number }> = [];
 
     for (const { id, content } of processed.chunks) {
-      const start = Date.now();
-      const physicsResult = await rateLimiter.schedule(() =>
-        physicsAgent.analyze(content)
-      );
-      results.push({ chunkId: id, result: physicsResult, durationMs: Date.now() - start });
+      const t0 = Date.now();
+      const res = await rateLimiter.schedule(() => physicsAgent.analyze(content));
+      results.push({ chunkId: id, result: res, durationMs: Date.now() - t0 });
     }
 
-    const aggregated = results
+    const analysis = results
       .sort((a, b) => a.chunkId - b.chunkId)
       .map(r => `[Chunk ${r.chunkId} - ${r.durationMs}ms]\n${r.result}`)
       .join('\n\n');
 
-    return {
-      analysis: aggregated,
-      metadata: processed.metadata,
-      timings: results.map(r => ({ chunkId: r.chunkId, durationMs: r.durationMs })),
-    };
+    return { analysis, metadata: processed.metadata, timings: results.map(r => ({ chunkId: r.chunkId, durationMs: r.durationMs })) };
   }
 }
