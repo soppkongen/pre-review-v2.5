@@ -3,7 +3,7 @@ import { RealOpenAIAgents } from '../real-openai-agents';
 import { AnalysisStorage } from '../kv-storage';
 import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
-import { encoding_for_model } from 'tiktoken';
+import { encodingForModel } from 'js-tiktoken';
 
 const TOKEN_MODEL = 'gpt-4-turbo';
 const MAX_INPUT_TOKENS = 5000;    // chunk size
@@ -11,7 +11,6 @@ const SUMMARY_MODEL = 'gpt-3.5-turbo-16k';
 const SUMMARY_TOKENS = 300;
 
 export class AgentOrchestrator {
-  /** Entry point: store initial status and run full analysis before responding */
   async analyzeDocument(
     file: File,
     summary?: string,
@@ -32,7 +31,6 @@ export class AgentOrchestrator {
     return analysisId;
   }
 
-  /** Orchestrates ingestion, chunking, RAG, multi-agent analysis, and persistence */
   async processDocumentAsync(
     analysisId: string,
     file: File,
@@ -50,11 +48,11 @@ export class AgentOrchestrator {
       await AnalysisStorage.store(analysisId, { status: 'running', timestamp: new Date().toISOString() });
 
       // 3. Tokenizer for chunking
-      const enc = encoding_for_model(TOKEN_MODEL);
-      const tokens = enc.encode(fullText);
+      const enc = encodingForModel(TOKEN_MODEL);
+      const tokenIds = enc.encode(fullText);
       const rawChunks: string[] = [];
-      for (let i = 0; i < tokens.length; i += MAX_INPUT_TOKENS) {
-        rawChunks.push(enc.decode(tokens.slice(i, i + MAX_INPUT_TOKENS)));
+      for (let i = 0; i < tokenIds.length; i += MAX_INPUT_TOKENS) {
+        rawChunks.push(enc.decode(tokenIds.slice(i, i + MAX_INPUT_TOKENS)));
       }
 
       // 4. Optionally summarize oversized chunks
@@ -78,12 +76,10 @@ export class AgentOrchestrator {
         RealOpenAIAgents.agentIds().map(async (agentId) => {
           const agentStart = Date.now();
           const combined = [];
-
           for (const chunk of chunks) {
             const res = await RealOpenAIAgents.runAgent(agentId, { text: chunk, context: knowledge });
             combined.push(res);
           }
-
           const durationMs = Date.now() - agentStart;
           return { agentId, combined, durationMs };
         })
