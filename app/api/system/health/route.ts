@@ -15,8 +15,9 @@ export async function GET() {
 
   try {
     // Check Weaviate connection
-    const client = getWeaviateClient()
-    await client.misc.metaGetter().do()
+    const client = await getWeaviateClient();
+    if (!client) throw new Error("Weaviate client not available");
+    await (client as any).misc.metaGetter().do();
     health.services.weaviate = "healthy"
   } catch (error) {
     console.error("Weaviate health check failed:", error)
