@@ -20,7 +20,7 @@ async function callOpenAI(
   maxTokens: number
 ): Promise<{ text: string; durationMs: number }> {
   const start = Date.now();
-  const completion = await rateLimiter.schedule(() =>
+  const response = await rateLimiter.schedule(() =>
     openai.chat.completions.create({
       model,
       messages: [
@@ -32,7 +32,7 @@ async function callOpenAI(
     })
   );
   return {
-    text: completion.choices[0].message.content.trim(),
+    text: response.choices[0].message.content.trim(),
     durationMs: Date.now() - start,
   };
 }
