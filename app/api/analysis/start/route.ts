@@ -25,12 +25,10 @@ export async function POST(req: Request) {
     timestamp: new Date().toISOString(),
   });
 
-  // Run the full analysis pipeline to completion before responding
+  // Execute the full analysis pipeline synchronously
   const orchestrator = new AgentOrchestrator();
   await orchestrator.processDocumentAsync(analysisId, file, summary, reviewMode);
 
-  // Return the ID only after analysis is done
+  // Return the ID only after processing completes
   return NextResponse.json({ analysisId });
 }
-
-
