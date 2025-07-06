@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AgentOrchestrator } from '@/lib/services/agent-orchestrator';
 
+// ADD THESE LINES AT THE TOP
+export const maxDuration = 300; // 5 minutes
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const file = formData.get('file') as File;
