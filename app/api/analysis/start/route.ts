@@ -14,7 +14,23 @@ export async function POST(req: Request) {
   const summary = form.get('summary') as string | undefined;
   const reviewMode = (form.get('reviewMode') as string) || 'full';
 
+  // Generate a new analysis ID and persist initial state
+  const analysisId = uuidv4();
+  await AnalysisStorage.store(analysisId, {
+    analysisId,
+    documentName: file.name,
+    reviewMode,
+    summary,
+    status: 'processing',
+    timestamp: new Date().toISOString(),
+  });
+
+  // Run the full analysis pipeline to completion before responding
   const orchestrator = new AgentOrchestrator();
-  const analysisId = await orchestrator.analyzeDocument(file, summary, reviewMode);
+  await orchestrator.processDocumentAsync(analysisId, file, summary, reviewMode);
+
+  // Return the ID only after analysis is done
   return NextResponse.json({ analysisId });
+}
+
 }
