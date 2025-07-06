@@ -11,8 +11,8 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  // Enable SWC minification (supports ES modules) and ESM externals
-  swcMinify: true,
+  // Remove swcMinify (Next.js v15 handles minification with SWC automatically)
+  // Enable ESM externals so ES modules in lib/ are respected
   experimental: {
     esmExternals: true
   },
