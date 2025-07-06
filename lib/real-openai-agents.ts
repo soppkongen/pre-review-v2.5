@@ -19,8 +19,8 @@ async function callOpenAI(
   model: string,
   maxTokens: number
 ): Promise<{ text: string; durationMs: number }> {
-  const start = Date.now();
-  const response = await rateLimiter.schedule(() =>
+  const t0 = Date.now();
+  const res = await rateLimiter.schedule(() =>
     openai.chat.completions.create({
       model,
       messages: [
@@ -31,60 +31,50 @@ async function callOpenAI(
       max_tokens: maxTokens,
     })
   );
-  return {
-    text: response.choices[0].message.content.trim(),
-    durationMs: Date.now() - start,
-  };
+  return { text: res.choices[0].message.content.trim(), durationMs: Date.now() - t0 };
 }
 
 export const RealOpenAIAgents = {
-  async summarizeChunk(
-    text: string,
-    model: string,
-    maxTokens: number
-  ): Promise<{ text: string }> {
+  async summarizeChunk(text: string, model: string, maxTokens: number): Promise<{ text: string }> {
     const prompt = `Summarize this text in up to ${maxTokens} tokens:\n\n${text}`;
-    const { text: summary } = await callOpenAI('summarizer', prompt, model, maxTokens);
-    return { text: summary };
+    const { text: sum } = await callOpenAI('summarizer', prompt, model, maxTokens);
+    return { text: sum };
   },
 
   async theoreticalAgent(opts: { text: string; context?: string[] }): Promise<AgentResult> {
     const prompt = [
-      "Provide a **theoretical** analysis of the paper.",
-      opts.context ? `Context:\n${opts.context.join('\n')}` : '',
+      "Provide a **theoretical** analysis.",
+      opts.context?.length ? `Context:\n${opts.context.join('\n')}` : '',
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
     const { text, durationMs } = await callOpenAI('theoretical physicist', prompt, 'gpt-4-turbo', 250);
-    const parsed = JSON.parse(text);
-    return { agentName: "Theoretical Physicist", role: "Theory", confidence: 0.9, ...parsed, durationMs };
+    return { agentName: "Theoretical Physicist", role: "Theory", confidence: 0.9, ...JSON.parse(text), durationMs };
   },
 
   async mathematicalAgent(opts: { text: string; context?: string[] }): Promise<AgentResult> {
     const prompt = [
-      "Analyze the **mathematical** soundness and rigor.",
-      opts.context ? `Context:\n${opts.context.join('\n')}` : '',
+      "Analyze the **mathematical** rigor.",
+      opts.context?.length ? `Context:\n${opts.context.join('\n')}` : '',
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
     const { text, durationMs } = await callOpenAI('mathematician', prompt, 'gpt-4-turbo', 250);
-    const parsed = JSON.parse(text);
-    return { agentName: "Mathematical Analyst", role: "Mathematics", confidence: 0.85, ...parsed, durationMs };
+    return { agentName: "Mathematical Analyst", role: "Mathematics", confidence: 0.85, ...JSON.parse(text), durationMs };
   },
 
   async epistemicAgent(opts: { text: string; context?: string[] }): Promise<AgentResult> {
     const prompt = [
-      "Evaluate the **epistemic** quality and reliability.",
-      opts.context ? `Context:\n${opts.context.join('\n')}` : '',
+      "Evaluate the **epistemic** quality.",
+      opts.context?.length ? `Context:\n${opts.context.join('\n')}` : '',
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
     const { text, durationMs } = await callOpenAI('epistemic reviewer', prompt, 'gpt-4-turbo', 250);
-    const parsed = JSON.parse(text);
-    return { agentName: "Epistemic Reviewer", role: "Epistemics", confidence: 0.8, ...parsed, durationMs };
+    return { agentName: "Epistemic Reviewer", role: "Epistemics", confidence: 0.8, ...JSON.parse(text), durationMs };
   },
 
-  async runAllAgents(opts: { text: string; context?: string[] }): Promise<AgentResult[]> {
+  async runAllAgents(opts: { text: string; context?: string[] }) {
     return Promise.all([
       this.theoreticalAgent(opts),
       this.mathematicalAgent(opts),
@@ -96,7 +86,7 @@ export const RealOpenAIAgents = {
     return ['theoretical', 'mathematical', 'epistemic'];
   },
 
-  async runAgent(agentId: string, opts: { text: string; context?: string[] }): Promise<AgentResult> {
+  async runAgent(agentId: string, opts: { text: string; context?: string[] }) {
     switch (agentId) {
       case 'theoretical': return this.theoreticalAgent(opts);
       case 'mathematical': return this.mathematicalAgent(opts);
