@@ -1,4 +1,4 @@
-import { PaperChunker, Chunk } from '@/lib/processors/paper-chunker';
+import { PaperChunker, Chunk } from './processors/paper-chunker';
 
 export interface ProcessedDocument {
   chunks: Chunk[];

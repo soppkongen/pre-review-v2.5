@@ -1,6 +1,6 @@
-import { RealDocumentProcessor, ProcessedDocument } from '@/lib/real-document-processor';
-import { PhysicsAgent } from '@/lib/agents/physicsAgent';
-import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
+import { RealDocumentProcessor, ProcessedDocument } from './real-document-processor';
+import { PhysicsAgent } from './agents/physicsAgent';
+import { OpenAIRateLimiter } from './ai/rate-limiter';
 
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 1 });
 

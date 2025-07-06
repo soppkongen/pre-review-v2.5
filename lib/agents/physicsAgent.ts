@@ -1,4 +1,4 @@
-import { searchPhysicsKnowledge } from '@/lib/weaviate';
+import { searchPhysicsKnowledge } from '../weaviate';
 
 export class PhysicsAgent {
   async analyze(content: string) {

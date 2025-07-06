@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
+import { OpenAIRateLimiter } from './ai/rate-limiter';
 
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 3000, concurrency: 1, maxRetries: 2 });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
