@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
 
+// Rate limiter with 1s minimum interval and up to 2 concurrent calls
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 1000, concurrency: 2 });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -92,14 +93,14 @@ export const RealOpenAIAgents = {
   },
 
   async runAllAgents(opts: { text: string; context?: string[] }): Promise<AgentResult[]> {
-    return await Promise.all([
+    return Promise.all([
       this.theoreticalAgent(opts),
       this.mathematicalAgent(opts),
       this.epistemicAgent(opts),
     ]);
   },
 
-  // Helpers for per-agent instrumentation
+  // Helpers for instrumentation
   agentIds(): string[] {
     return ['theoretical', 'mathematical', 'epistemic'];
   },
