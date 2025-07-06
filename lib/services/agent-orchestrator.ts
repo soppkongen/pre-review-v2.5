@@ -5,7 +5,7 @@ import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
 
 export class AgentOrchestrator {
-  /** Entry point: store initial status and run analysis to completion */
+  /** Entry point: store initial status and run full analysis before responding */
   async analyzeDocument(
     file: File,
     summary?: string,
@@ -21,13 +21,13 @@ export class AgentOrchestrator {
       timestamp: new Date().toISOString(),
     });
 
-    // Run the full analysis before returning
+    // Run the full pipeline synchronously
     await this.processDocumentAsync(analysisId, file, summary, reviewMode);
     return analysisId;
   }
 
-  /** Orchestrates ingestion, RAG, multi-agent calls, and persistence */
-  private async processDocumentAsync(
+  /** Orchestrates ingestion, RAG, multi-agent analysis, and persistence */
+  async processDocumentAsync(
     analysisId: string,
     file: File,
     summary?: string,
@@ -46,7 +46,7 @@ export class AgentOrchestrator {
         timestamp: new Date().toISOString(),
       });
 
-      // 3. Run each agent with instrumentation
+      // 3. Run each agent in parallel with instrumentation
       const agentPromises = RealOpenAIAgents.agentIds().map(async (agentId) => {
         console.log(`Starting agent ${agentId} at ${new Date().toISOString()}`);
         const res = await RealOpenAIAgents.runAgent(agentId, {
@@ -85,7 +85,10 @@ export class AgentOrchestrator {
         keyFindings: allFindings,
         recommendations: allRecommendations,
         detailedAnalysis: agentResults.reduce((acc, a) => {
-          acc[a.agentName] = { findings: a.findings, recommendations: a.recommendations };
+          acc[a.agentName] = {
+            findings: a.findings,
+            recommendations: a.recommendations,
+          };
           return acc;
         }, {} as Record<string, any>),
         timings: { totalDurationMs },
