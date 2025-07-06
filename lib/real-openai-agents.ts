@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
+const rateLimiter = new OpenAIRateLimiter();
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,17 +15,13 @@ export interface AgentResult {
 }
 
 async function callOpenAI(role: string, prompt: string): Promise<string> {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: `You are a ${role} reviewing a scientific paper. Respond with numbered findings and recommendations.` },
-      { role: "user", content: prompt },
-    ],
-    max_tokens: 512,
-    temperature: 0.7,
-  });
-  return completion.choices[0]?.message?.content ?? "No response";
-}
+ const completion = await rateLimiter.schedule(() =>
+  openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: chunkContent }]
+  })
+);
+
 
 export const RealOpenAIAgents = {
   async theoreticalAgent(text: string): Promise<AgentResult> {
