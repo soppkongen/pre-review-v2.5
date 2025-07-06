@@ -1,3 +1,4 @@
+import './lib/real-document-processor.js';
 import { dequeueJob, setJobStatus, setJobResult } from './lib/kv-job-queue.js';
 import { AgentOrchestrator } from './lib/services/agent-orchestrator.js';
 async function processJob(job) {
