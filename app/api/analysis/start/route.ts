@@ -1,26 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { AgentOrchestrator } from '@/lib/services/agent-orchestrator';
+import { AnalysisStorage } from '@/lib/kv-storage';
+import { v4 as uuidv4 } from 'uuid';
 
-// ADD THESE LINES AT THE TOP
-export const maxDuration = 300; // 5 minutes
-export const dynamic = 'force-dynamic';
+export const config = {
+  runtime: 'edge',
+  maxDuration: 300, // seconds
+};
 
-export async function POST(req: NextRequest) {
-  const formData = await req.formData();
-  const file = formData.get('file') as File;
-  const summary = formData.get('summary') as string;
-  const reviewMode = formData.get('reviewMode') as string;
+export async function POST(req: Request) {
+  const form = await req.formData();
+  const file = form.get('file') as File;
+  const summary = form.get('summary') as string | undefined;
+  const reviewMode = (form.get('reviewMode') as string) || 'full';
 
-  if (!file) {
-    return NextResponse.json({ error: 'Missing file' }, { status: 400 });
-  }
-
-  try {
-    const orchestrator = new AgentOrchestrator();
-    const analysisId = await orchestrator.analyzeDocument(file, summary, reviewMode);
-    return NextResponse.json({ analysisId });
-  } catch (error) {
-    console.error('Analysis error:', error);
-    return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
-  }
+  const orchestrator = new AgentOrchestrator();
+  const analysisId = await orchestrator.analyzeDocument(file, summary, reviewMode);
+  return NextResponse.json({ analysisId });
 }
