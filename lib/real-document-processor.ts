@@ -2,10 +2,7 @@ import { PaperChunker, Chunk } from '@/lib/processors/paper-chunker';
 
 export interface ProcessedDocument {
   chunks: Chunk[];
-  metadata: {
-    fileType: string;
-    fileName: string;
-  };
+  metadata: { fileType: string; fileName: string };
   getContent: () => string;
   getTitle: () => string;
   getSupportedFileTypes: () => string[];
@@ -21,14 +18,11 @@ export const RealDocumentProcessor = {
 
     return {
       chunks,
-      metadata: {
-        fileType: file.type,
-        fileName: file.name,
-      },
+      metadata: { fileType: file.type, fileName: file.name },
       getContent: () => text,
       getTitle: () => file.name,
       getSupportedFileTypes: () => ['pdf', 'txt', 'docx'],
-      getMaxFileSize: () => 10 * 1024 * 1024, // 10 MB
+      getMaxFileSize: () => 10 * 1024 * 1024,
     };
   },
 };
