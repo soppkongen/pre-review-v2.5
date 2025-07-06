@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "tsc",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start",
+    "start": "node dist/worker.js",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

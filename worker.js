@@ -1,4 +1,4 @@
-// worker.js
+// worker.ts
 import { dequeueJob, setJobStatus, setJobResult } from './lib/kv-job-queue.js';
 import { AgentOrchestrator } from './lib/services/agent-orchestrator.js';
 
