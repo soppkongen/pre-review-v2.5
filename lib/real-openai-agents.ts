@@ -22,7 +22,7 @@ async function callOpenAI(
   const start = Date.now();
   const completion = await rateLimiter.schedule(() =>
     openai.chat.completions.create({
-      model: 'gpt-4-turbo-128k',
+      model: 'gpt-4-turbo',        // ← updated to valid model
       messages: [
         { role: 'system', content: `You are a ${role}.` },
         { role: 'user', content: prompt }
