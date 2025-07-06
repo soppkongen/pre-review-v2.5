@@ -1,8 +1,7 @@
 import OpenAI from "openai";
 import { OpenAIRateLimiter } from '@/lib/ai/rate-limiter';
 
-// Limit to 1 call per 6s and max 2 concurrent calls to stay under TPM
-const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 2 });
+const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 15000, concurrency: 1 });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export interface AgentResult {
@@ -17,12 +16,13 @@ export interface AgentResult {
 async function callOpenAI(
   role: string,
   prompt: string,
-  maxTokens = 500
+  model: string,
+  maxTokens: number
 ): Promise<{ text: string; durationMs: number }> {
   const start = Date.now();
   const completion = await rateLimiter.schedule(() =>
     openai.chat.completions.create({
-      model: 'gpt-4-turbo',        // ← updated to valid model
+      model,
       messages: [
         { role: 'system', content: `You are a ${role}.` },
         { role: 'user', content: prompt }
@@ -31,14 +31,23 @@ async function callOpenAI(
       max_tokens: maxTokens,
     })
   );
-  const durationMs = Date.now() - start;
   return {
     text: completion.choices[0].message.content.trim(),
-    durationMs,
+    durationMs: Date.now() - start,
   };
 }
 
 export const RealOpenAIAgents = {
+  async summarizeChunk(
+    text: string,
+    model: string,
+    maxTokens: number
+  ): Promise<{ text: string }> {
+    const prompt = `Summarize this text in up to ${maxTokens} tokens:\n\n${text}`;
+    const { text: summary } = await callOpenAI('summarizer', prompt, model, maxTokens);
+    return { text: summary };
+  },
+
   async theoreticalAgent(opts: { text: string; context?: string[] }): Promise<AgentResult> {
     const prompt = [
       "Provide a **theoretical** analysis of the paper.",
@@ -46,16 +55,9 @@ export const RealOpenAIAgents = {
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
-
-    const { text, durationMs } = await callOpenAI("theoretical physicist", prompt);
+    const { text, durationMs } = await callOpenAI('theoretical physicist', prompt, 'gpt-4-turbo', 250);
     const parsed = JSON.parse(text);
-    return {
-      agentName: "Theoretical Physicist",
-      role: "Theory",
-      confidence: 0.9,
-      ...parsed,
-      durationMs,
-    };
+    return { agentName: "Theoretical Physicist", role: "Theory", confidence: 0.9, ...parsed, durationMs };
   },
 
   async mathematicalAgent(opts: { text: string; context?: string[] }): Promise<AgentResult> {
@@ -65,16 +67,9 @@ export const RealOpenAIAgents = {
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
-
-    const { text, durationMs } = await callOpenAI("mathematician", prompt);
+    const { text, durationMs } = await callOpenAI('mathematician', prompt, 'gpt-4-turbo', 250);
     const parsed = JSON.parse(text);
-    return {
-      agentName: "Mathematical Analyst",
-      role: "Mathematics",
-      confidence: 0.85,
-      ...parsed,
-      durationMs,
-    };
+    return { agentName: "Mathematical Analyst", role: "Mathematics", confidence: 0.85, ...parsed, durationMs };
   },
 
   async epistemicAgent(opts: { text: string; context?: string[] }): Promise<AgentResult> {
@@ -84,16 +79,9 @@ export const RealOpenAIAgents = {
       `Content:\n${opts.text}`,
       "Return JSON: { observations: string[], strengths: string[], weaknesses: string[], recommendations: string[] }"
     ].filter(Boolean).join('\n\n');
-
-    const { text, durationMs } = await callOpenAI("epistemic reviewer", prompt);
+    const { text, durationMs } = await callOpenAI('epistemic reviewer', prompt, 'gpt-4-turbo', 250);
     const parsed = JSON.parse(text);
-    return {
-      agentName: "Epistemic Reviewer",
-      role: "Epistemics",
-      confidence: 0.8,
-      ...parsed,
-      durationMs,
-    };
+    return { agentName: "Epistemic Reviewer", role: "Epistemics", confidence: 0.8, ...parsed, durationMs };
   },
 
   async runAllAgents(opts: { text: string; context?: string[] }): Promise<AgentResult[]> {
@@ -108,19 +96,12 @@ export const RealOpenAIAgents = {
     return ['theoretical', 'mathematical', 'epistemic'];
   },
 
-  async runAgent(
-    agentId: string,
-    opts: { text: string; context?: string[] }
-  ): Promise<AgentResult> {
+  async runAgent(agentId: string, opts: { text: string; context?: string[] }): Promise<AgentResult> {
     switch (agentId) {
-      case 'theoretical':
-        return this.theoreticalAgent(opts);
-      case 'mathematical':
-        return this.mathematicalAgent(opts);
-      case 'epistemic':
-        return this.epistemicAgent(opts);
-      default:
-        throw new Error(`Unknown agent ${agentId}`);
+      case 'theoretical': return this.theoreticalAgent(opts);
+      case 'mathematical': return this.mathematicalAgent(opts);
+      case 'epistemic': return this.epistemicAgent(opts);
+      default: throw new Error(`Unknown agent ${agentId}`);
     }
   },
 };
