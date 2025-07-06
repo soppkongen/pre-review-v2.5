@@ -21,21 +21,24 @@ export async function POST(request: NextRequest) {
     const processed = await processor.processFile(file)
 
     // Extract authors from content (simple heuristic)
-    const authors = extractAuthors(RealDocumentProcessor.getContent(processed))
+    const authors = extractAuthors(processed.getContent())
 
     // Extract abstract (simple heuristic)
-    const abstract = extractAbstract(RealDocumentProcessor.getContent(processed))
+    const abstract = extractAbstract(processed.getContent())
 
     // Store in Weaviate
-    const client = getWeaviateClient()
-    const result = await client.data
+    const client = await getWeaviateClient();
+    if (!client) {
+      return NextResponse.json({ error: "Failed to connect to Weaviate" }, { status: 500 });
+    }
+    const result = await (client as any).data
       .creator()
       .withClassName("ResearchPaper")
       .withProperties({
-        title: RealDocumentProcessor.getTitle(processed),
+        title: processed.getTitle(),
         authors: authors,
         abstract: abstract,
-        content: RealDocumentProcessor.getContent(processed),
+        content: processed.getContent(),
         field: field,
         keywords: keywords
           .split(",")
@@ -44,15 +47,15 @@ export async function POST(request: NextRequest) {
         uploadDate: new Date().toISOString(),
         fileType: processed.metadata.fileType,
       })
-      .do()
+      .do();
 
     return NextResponse.json({
       success: true,
       paperId: result.id,
-      title: RealDocumentProcessor.getTitle(processed),
+      title: processed.getTitle(),
       metadata: processed.metadata,
       message: "Document uploaded and processed successfully",
-    })
+    });
   } catch (error) {
     console.error("Document upload error:", error)
     return NextResponse.json({ error: "Failed to upload and process document" }, { status: 500 })
@@ -106,11 +109,10 @@ function extractAbstract(content: string): string {
 }
 
 export async function GET() {
-  const processor = RealDocumentProcessor
-
+  // Use static values for supportedFileTypes and maxFileSize
   return NextResponse.json({
-    supportedFileTypes: processor.getSupportedFileTypes(),
-    maxFileSize: processor.getMaxFileSize(),
-    maxFileSizeMB: processor.getMaxFileSize() / (1024 * 1024),
+    supportedFileTypes: ['pdf', 'txt', 'docx'],
+    maxFileSize: 10 * 1024 * 1024,
+    maxFileSizeMB: 10,
   })
 }
