@@ -5,6 +5,14 @@
   "installCommand": "pnpm install --no-frozen-lockfile",
   "devCommand": "pnpm dev",
   "outputDirectory": ".next",
+  "functions": {
+    "app/api/analysis/**": {
+      "maxDuration": 300
+    },
+    "app/api/documents/**": {
+      "maxDuration": 300
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -31,51 +39,5 @@
     "CACHE_TTL_SECONDS": "3600",
     "MAX_RETRY_ATTEMPTS": "3",
     "RETRY_DELAY_MS": "1000"
-  },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_APP_URL": "https://www.pre-review.com/",
-      "NEXT_PUBLIC_APP_NAME": "Pre-Review Platform",
-      "NEXT_PUBLIC_APP_VERSION": "2.5.0",
-      "WEAVIATE_CLASS_NAME": "ResearchPaper",
-      "MAX_FILE_SIZE_BYTES": "10485760",
-      "SUPPORTED_FILE_TYPES": "pdf,docx,txt",
-      "UPLOAD_TIMEOUT_MS": "30000",
-      "ANALYSIS_TIMEOUT_MS": "300000",
-      "MAX_CONCURRENT_ANALYSES": "5",
-      "ANALYSIS_CACHE_TTL": "86400",
-      "CORS_ORIGINS": "https://www.pre-review.com,http://localhost:3000",
-      "RATE_LIMIT_REQUESTS": "100",
-      "RATE_LIMIT_WINDOW_MS": "900000",
-      "LOG_LEVEL": "info",
-      "ENABLE_DEBUG_LOGS": "false",
-      "ENABLE_CACHING": "true",
-      "CACHE_TTL_SECONDS": "3600",
-      "MAX_RETRY_ATTEMPTS": "3",
-      "RETRY_DELAY_MS": "1000"
-    }
-  },
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        }
-      ]
-    }
-  ]
+  }
 }
