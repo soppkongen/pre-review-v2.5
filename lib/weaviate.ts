@@ -2,6 +2,7 @@ import weaviate, { WeaviateClient, ApiKey } from 'weaviate-client';
 
 const weaviateURL = process.env.WEAVIATE_URL as string;
 const weaviateApiKey = process.env.WEAVIATE_API_KEY as string;
+const openaiApiKey = process.env.OPENAI_APIKEY as string;
 
 let client: WeaviateClient | null = null;
 
@@ -19,10 +20,15 @@ export async function getWeaviateClient(): Promise<WeaviateClient | null> {
     console.warn('[Weaviate] Missing WEAVIATE_API_KEY environment variable');
     return null;
   }
+  if (!openaiApiKey) {
+    console.warn('[Weaviate] Missing OPENAI_APIKEY environment variable');
+    return null;
+  }
 
   try {
     client = await weaviate.connectToWeaviateCloud(weaviateURL, {
       authCredentials: new weaviate.ApiKey(weaviateApiKey),
+      headers: { 'X-Openai-Api-Key': openaiApiKey },
     });
 
     const ready = await client.isReady();
