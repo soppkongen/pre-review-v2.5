@@ -1,4 +1,4 @@
-import { PaperChunker, Chunk } from './processors/paper-chunker';
+import { PaperChunker, Chunk } from './processors/paper-chunker.js';
 
 export interface FileLike {
   name: string;
