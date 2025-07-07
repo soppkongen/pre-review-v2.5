@@ -28,6 +28,8 @@ async function processJob(jobId) {
       ...jobData, 
       status: 'completed', 
       result: result,
+      analysisId: jobId,
+      id: jobId,
       completedAt: new Date().toISOString()
     });
 
