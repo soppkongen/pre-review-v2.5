@@ -1,4 +1,4 @@
-import { RealDocumentProcessor, FileLike } from '../real-document-processor';
+import { RealDocumentProcessor, FileLike } from '../real-document-processor.js';
 import { RealOpenAIAgents } from '../real-openai-agents';
 import { AnalysisStorage } from '../kv-storage';
 import { searchPhysicsKnowledge } from '../weaviate';
