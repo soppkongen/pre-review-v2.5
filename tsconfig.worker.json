@@ -3,7 +3,7 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "node",
-    "outDir": "dist/worker",
+    "outDir": "dist",
     "noEmit": false,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
