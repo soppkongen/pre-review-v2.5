@@ -3,10 +3,8 @@ import { RealOpenAIAgents } from '../real-openai-agents';
 import { AnalysisStorage } from '../kv-storage';
 import { searchPhysicsKnowledge } from '../weaviate';
 import { v4 as uuidv4 } from 'uuid';
-import { encodingForModel } from 'js-tiktoken';
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
-const TOKEN_MODEL = MODEL;
 const SUMMARY_MODEL = MODEL;
 const SUMMARY_TOKENS = 300;
 
@@ -94,6 +92,7 @@ export class AgentOrchestrator {
       await AnalysisStorage.store(analysisId, { status: 'running', timestamp: new Date().toISOString() });
       // 3. Use chunks from PaperChunker only
       const chunks = processed.chunks.map(chunk => chunk.content);
+      console.log(`[Orchestrator] Number of chunks: ${chunks.length}`);
       // 4. Run each agent across all chunks
       const perAgent = await Promise.all(
         RealOpenAIAgents.agentIds().map(async (agentId) => {
@@ -109,39 +108,21 @@ export class AgentOrchestrator {
       // 5. Aggregate
       const allResults = perAgent.flatMap(a => a.results);
       const confidences = allResults.map(r => r.confidence);
-      const avgConfidence = confidences.reduce((s, c) => s + c, 0) / confidences.length;
-      const overallScore = Math.round(avgConfidence * 100) / 10;
-      const keyFindings = allResults.flatMap(r => r.findings);
       const recommendations = allResults.flatMap(r => r.recommendations);
-
       // 6. Persist final
       await AnalysisStorage.store(analysisId, {
         analysisId,
-        documentName: file.name,
-        reviewMode,
-        summary: keyFindings.join('\n'),
         status: 'completed',
-        timestamp: new Date().toISOString(),
-        agentResults: allResults,
-        overallScore,
-        confidence: avgConfidence,
-        keyFindings,
+        results: allResults,
+        confidences,
         recommendations,
-        detailedAnalysis: perAgent.reduce((acc, a) => {
-          acc[a.agentId] = { results: a.results, durationMs: a.durationMs };
-          return acc;
-        }, {} as Record<string, any>),
-        timings: { totalDurationMs },
-        error: '',
         timestamps: { started: startAll, finished: Date.now() },
       });
-
       return {
         perAgent,
         allResults,
         confidences,
         totalDurationMs,
-        // ...add any other fields as needed
       };
     } catch (error) {
       await AnalysisStorage.store(analysisId, {
