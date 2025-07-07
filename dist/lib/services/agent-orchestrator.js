@@ -1,7 +1,7 @@
-import { RealDocumentProcessor } from '../real-document-processor';
-import { RealOpenAIAgents } from '../real-openai-agents';
-import { AnalysisStorage } from '../kv-storage';
-import { searchPhysicsKnowledge } from '../weaviate';
+import { RealDocumentProcessor } from '../real-document-processor.js';
+import { RealOpenAIAgents } from '../real-openai-agents.js';
+import { AnalysisStorage } from '../kv-storage.js';
+import { searchPhysicsKnowledge } from '../weaviate.js';
 import { v4 as uuidv4 } from 'uuid';
 const MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 const SUMMARY_MODEL = MODEL;

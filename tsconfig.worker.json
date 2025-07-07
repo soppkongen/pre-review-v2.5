@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "noEmit": false,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
+  },
+  "include": [
+    "worker.ts",
+    "lib/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "app/**/*",
+    "components/**/*",
+    "hooks/**/*",
+    "styles/**/*"
+  ]
+} 

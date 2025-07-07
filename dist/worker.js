@@ -6,16 +6,9 @@ async function processJob(job) {
     await setJobStatus(job.id, 'running');
     try {
         const orchestrator = new AgentOrchestrator();
-        // For now, run all agents sequentially and aggregate results
-        const agents = orchestrator.getAgents();
-        const results = [];
-        for (const agent of agents) {
-            const result = await orchestrator.analyzeWithAgent(agent.id, job.paperContent, job.paperTitle);
-            results.push({ agentId: agent.id, result });
-            // Small delay to avoid rate limits
-            await new Promise(res => setTimeout(res, 500));
-        }
-        await setJobResult(job.id, { results });
+        // Use the orchestrator's chunked analysis for the whole document
+        const result = await orchestrator.processDocumentAsync(job.id, job.paperContent, job.paperTitle);
+        await setJobResult(job.id, result);
         await setJobStatus(job.id, 'completed');
         console.log(`[Worker] Job ${job.id} completed.`);
     }
