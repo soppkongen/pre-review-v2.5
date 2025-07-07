@@ -9,6 +9,7 @@ const JOB_RESULT_PREFIX = 'analysis:result:';
 export async function enqueueJob(job) {
     await redis.rpush(JOB_QUEUE_KEY, JSON.stringify(job));
     await setJobStatus(job.id, 'pending');
+    await redis.set(`job:${job.id}`, { ...job, status: 'pending' });
 }
 export async function dequeueJob() {
     const res = await redis.lpop(JOB_QUEUE_KEY);

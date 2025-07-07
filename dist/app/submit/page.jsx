@@ -55,7 +55,7 @@ export default function SubmitPage() {
             }
             const result = await response.json();
             // Redirect to results page with analysis ID
-            router.push(`/results?id=${result.analysisId}`);
+            router.push(`/results?id=${result.jobId}`);
         }
         catch (error) {
             console.error('Submission error:', error);

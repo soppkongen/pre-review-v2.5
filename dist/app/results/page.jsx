@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -14,42 +14,58 @@ export default function ResultsPage() {
     const [results, setResults] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [processing, setProcessing] = useState(false);
+    const pollTimeoutRef = useRef(null);
+    const pollStartTimeRef = useRef(null);
+    const POLL_INTERVAL = 3000; // 3 seconds
+    const POLL_TIMEOUT = 5 * 60 * 1000; // 5 minutes
     useEffect(() => {
         if (!analysisId || analysisId === 'undefined') {
             setError('No analysis ID provided');
             setLoading(false);
         }
         else {
-            fetchResults(analysisId);
+            pollStartTimeRef.current = Date.now();
+            fetchResultsWithPolling(analysisId);
         }
+        return () => {
+            if (pollTimeoutRef.current)
+                clearTimeout(pollTimeoutRef.current);
+        };
     }, [analysisId]);
-    const fetchResults = async (id) => {
+    const fetchResultsWithPolling = async (id) => {
+        setLoading(true);
+        setProcessing(false);
+        setError(null);
         try {
-            console.log(`[Frontend] Fetching results for analysis ID: ${id}`);
             const response = await fetch(`/api/analysis/${id}`);
-            console.log(`[Frontend] Response status: ${response.status}`);
-            console.log(`[Frontend] Response headers:`, Object.fromEntries(response.headers.entries()));
+            if (response.status === 404) {
+                // Not ready yet, keep polling
+                if (pollStartTimeRef.current && Date.now() - pollStartTimeRef.current < POLL_TIMEOUT) {
+                    setProcessing(true);
+                    pollTimeoutRef.current = setTimeout(() => fetchResultsWithPolling(id), POLL_INTERVAL);
+                }
+                else {
+                    setError('Analysis timed out. Please try again later.');
+                    setLoading(false);
+                }
+                return;
+            }
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`[Frontend] Response not OK. Status: ${response.status}, Body:`, errorText);
                 throw new Error(`Failed to fetch results: ${response.status} ${errorText}`);
             }
             const contentType = response.headers.get('content-type');
-            console.log(`[Frontend] Content-Type: ${contentType}`);
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
-                console.error(`[Frontend] Unexpected content type: ${contentType}. Response body:`, text);
                 throw new Error(`Unexpected content type: ${contentType}`);
             }
             const data = await response.json();
-            console.log(`[Frontend] Received data:`, data);
             setResults(data);
+            setLoading(false);
         }
         catch (err) {
-            console.error(`[Frontend] Error fetching results:`, err);
             setError(err instanceof Error ? err.message : 'Unknown error');
-        }
-        finally {
             setLoading(false);
         }
     };
@@ -67,13 +83,17 @@ export default function ResultsPage() {
             return "secondary";
         return "destructive";
     };
-    if (loading) {
+    if (loading || processing) {
         return (<div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-            <h2 className="text-xl font-semibold text-gray-900">Loading Analysis Results...</h2>
-            <p className="text-gray-600 mt-2">Please wait while we retrieve your analysis.</p>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {processing ? 'Analysis in Progress...' : 'Loading Analysis Results...'}
+            </h2>
+            <p className="text-gray-600 mt-2">
+              {processing ? 'Your analysis is still being processed. This may take a few minutes.' : 'Please wait while we retrieve your analysis.'}
+            </p>
           </div>
         </div>
       </div>);

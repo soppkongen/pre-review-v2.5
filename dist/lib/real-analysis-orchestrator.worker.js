@@ -3,19 +3,58 @@ import { PhysicsAgent } from './agents/physicsAgent.worker.js';
 import { OpenAIRateLimiter } from './ai/rate-limiter.js';
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 1 });
 export class RealAnalysisOrchestrator {
-    async processDocumentAsync(file) {
+    async processDocumentAsync(file, analysisId, reviewMode = 'full') {
         const processed = await RealDocumentProcessor.processFile(file);
         const physicsAgent = new PhysicsAgent();
         const results = [];
+        let allFindings = [];
+        let allRecommendations = [];
+        let agentResults = [];
+        let confidences = [];
         for (const { id, content } of processed.chunks) {
             const t0 = Date.now();
             const res = await rateLimiter.schedule(() => physicsAgent.analyze(content));
             results.push({ chunkId: id, result: res, durationMs: Date.now() - t0 });
+            if (res.summary)
+                allFindings.push(res.summary);
+            if (Array.isArray(res.recommendations))
+                allRecommendations.push(...res.recommendations);
+            agentResults.push({
+                agentName: 'PhysicsAgent',
+                role: 'Physics',
+                confidence: 1.0,
+                findings: [res.summary],
+                recommendations: res.recommendations,
+            });
+            confidences.push(1.0);
         }
         const analysis = results
             .sort((a, b) => a.chunkId - b.chunkId)
-            .map(r => `[Chunk ${r.chunkId} - ${r.durationMs}ms]\n${r.result}`)
+            .map(r => `[Chunk ${r.chunkId} - ${r.durationMs}ms]\n${typeof r.result === 'string' ? r.result : JSON.stringify(r.result)}`)
             .join('\n\n');
-        return { analysis, metadata: processed.metadata, timings: results.map(r => ({ chunkId: r.chunkId, durationMs: r.durationMs })) };
+        const avgConfidence = confidences.length > 0 ? confidences.reduce((s, c) => s + c, 0) / confidences.length : 1.0;
+        const overallScore = Math.round(avgConfidence * 100) / 10;
+        return {
+            analysisId: analysisId || '',
+            documentName: file.name,
+            reviewMode,
+            status: 'completed',
+            summary: allFindings.join('\n'),
+            keyFindings: allFindings,
+            recommendations: allRecommendations,
+            agentResults,
+            overallScore,
+            confidence: avgConfidence,
+            detailedAnalysis: {
+                PhysicsAgent: {
+                    results: agentResults,
+                    durationMs: results.reduce((s, r) => s + r.durationMs, 0),
+                },
+            },
+            timings: { totalDurationMs: results.reduce((s, r) => s + r.durationMs, 0) },
+            error: '',
+            timestamp: new Date().toISOString(),
+            metadata: processed.metadata,
+        };
     }
 }

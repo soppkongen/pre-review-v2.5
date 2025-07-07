@@ -33,15 +33,16 @@ export async function getWeaviateClient() {
     }
 }
 /**
- * Fetches the full Weaviate schema.
+ * Fetches the full Weaviate schema (v3+ API: listAll collections).
  */
 export async function getSchema() {
     const client = await getWeaviateClient();
     if (!client)
         return null;
     try {
-        const schema = await client.schema.getter().do();
-        return schema;
+        // v3+ API: list all collections (schema)
+        const collections = await client.collections.listAll();
+        return collections;
     }
     catch (error) {
         console.error('[Weaviate] Failed to get schema:', error);
@@ -49,31 +50,23 @@ export async function getSchema() {
     }
 }
 /**
- * Searches the PhysicsChunk class using a nearText query.
+ * Searches the PhysicsChunk collection using a nearText query (v3+ client API).
  */
 export async function searchPhysicsKnowledge(query, limit = 5) {
     const client = await getWeaviateClient();
-    if (!client)
+    if (!client) {
+        console.error('[Weaviate] Client not initialized');
         return [];
+    }
     try {
-        const response = await client.graphql.get()
-            .withClassName('PhysicsChunk')
-            .withFields(`
-        chunkId
-        content
-        sourceDocument
-        domain
-        subdomain
-        contentType
-        difficultyLevel
-        concepts
-        prerequisites
-        source
-      `)
-            .withNearText({ concepts: [query] })
-            .withLimit(limit)
-            .do();
-        return response.data.Get.PhysicsChunk || [];
+        // v3+ API: use collections.get and .query.nearText
+        const collection = client.collections.get('PhysicsChunk');
+        const result = await collection.query.nearText(query, { limit });
+        if (!result || !result.objects) {
+            console.error('[Weaviate] Unexpected response:', result);
+            return [];
+        }
+        return result.objects;
     }
     catch (error) {
         console.error('[searchPhysicsKnowledge] Weaviate query failed:', error);
