@@ -1,7 +1,7 @@
 import './lib/real-document-processor.js';
-import { dequeueJob, setJobStatus, setJobResult, AnalysisJob } from './lib/kv-job-queue.js';
-import { AgentOrchestrator } from './lib/services/agent-orchestrator.js';
-import type { FileLike } from './lib/real-document-processor.js';
+import { dequeueJob, setJobStatus, setJobResult, AnalysisJob } from '../lib/kv-job-queue';
+import { AgentOrchestrator } from '../lib/services/agent-orchestrator';
+import type { FileLike } from '../lib/real-document-processor';
 
 // Helper to reconstruct a File-like object from job data
 function makeFileFromJob(job: AnalysisJob): FileLike {
