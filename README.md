@@ -28,3 +28,57 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+# Scientific Paper Analysis System: Agent & Worker Architecture
+
+## Agent System
+
+Each agent implements the following interface:
+
+```ts
+export interface AgentResult {
+  agentName: string;
+  role: string;
+  confidence: number;
+  findings: string[];
+  recommendations: string[];
+  durationMs: number;
+}
+```
+
+Agents are implemented as async functions that accept `{ text: string, context?: string[] }` and return an `AgentResult`. Example agents include theoretical, mathematical, and epistemic reviewers.
+
+## Agent Orchestrator
+
+The `AgentOrchestrator` class coordinates running all agents on all document chunks. It:
+- Accepts a File-like object (with `.name`, `.type`, and `.text()` method)
+- Chunks the document
+- Runs all registered agents on each chunk
+- Aggregates results (findings, recommendations, confidences)
+- Stores results in Redis for API retrieval
+
+## Worker Process
+
+The worker process runs independently and:
+- Polls the Redis job queue for new jobs
+- Reconstructs a File-like object from the job's base64 content, name, and type
+- Passes the file to the `AgentOrchestrator` for analysis
+- Stores the aggregated results and updates job status
+- Logs progress and errors for observability
+
+## Job Object Structure
+
+Jobs enqueued to the system must include:
+- `id`: Unique job ID
+- `paperContent`: Base64-encoded document content
+- `fileName`: Original file name
+- `fileType`: MIME type
+- `createdAt`: Timestamp
+
+## Extending the System
+
+To add a new agent:
+1. Implement the agent function with the required interface
+2. Register the agent in `RealOpenAIAgents` and the orchestrator
+
+To add new analysis types or outputs, update the orchestrator's aggregation logic and result schema.
