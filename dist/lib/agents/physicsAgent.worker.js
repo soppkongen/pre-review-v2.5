@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PhysicsAgent = void 0;
-const weaviate_js_1 = require("../weaviate.js");
+const weaviate_1 = require("../weaviate");
 class PhysicsAgent {
     async analyze(content) {
         try {
@@ -10,7 +10,7 @@ class PhysicsAgent {
             const searchQuery = content.length > 500 ? content.substring(0, 500) + '...' : content;
             console.log(`[PhysicsAgent] Searching knowledge base with query length: ${searchQuery.length}`);
             // Use the focused query for semantic search
-            const knowledgeResults = await (0, weaviate_js_1.searchPhysicsKnowledge)(searchQuery, 5);
+            const knowledgeResults = await (0, weaviate_1.searchPhysicsKnowledge)(searchQuery, 5);
             console.log(`[PhysicsAgent] Found ${knowledgeResults.length} relevant knowledge results`);
             // Generate a summary and recommendations based on the results
             const summary = knowledgeResults.length > 0

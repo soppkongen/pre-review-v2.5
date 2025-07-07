@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RealDocumentProcessor = void 0;
-const paper_chunker_js_1 = require("./processors/paper-chunker.js");
-const chunker = new paper_chunker_js_1.PaperChunker();
+const paper_chunker_1 = require("./processors/paper-chunker");
+const chunker = new paper_chunker_1.PaperChunker();
 exports.RealDocumentProcessor = {
     async processFile(file) {
         const text = await file.text();
