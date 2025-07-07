@@ -7,7 +7,6 @@ import { encodingForModel } from 'js-tiktoken';
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 const TOKEN_MODEL = MODEL;
-const MAX_INPUT_TOKENS = 5000;    // tokens per chunk
 const SUMMARY_MODEL = MODEL;
 const SUMMARY_TOKENS = 300;
 
@@ -87,34 +86,15 @@ export class AgentOrchestrator {
   ) {
     const startAll = Date.now();
     try {
-      // 1. Ingest & chunk
+      // 1. Ingest & chunk (only once)
       const processed = await RealDocumentProcessor.processFile(file);
       const fullText = processed.getContent();
-
       // 2. RAG (first 200 chars)
       const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
       await AnalysisStorage.store(analysisId, { status: 'running', timestamp: new Date().toISOString() });
-
-      // 3. Tokenizer for chunking
-      const enc = encodingForModel(TOKEN_MODEL as any);
-      const tokenIds = enc.encode(fullText);
-      const rawChunks: string[] = [];
-      for (let i = 0; i < tokenIds.length; i += MAX_INPUT_TOKENS) {
-        rawChunks.push(enc.decode(tokenIds.slice(i, i + MAX_INPUT_TOKENS)));
-      }
-
-      // 4. Summarize oversized chunks
-      const chunks = await Promise.all(
-        rawChunks.map(async (chunk) => {
-          if (enc.encode(chunk).length > MAX_INPUT_TOKENS * 0.8) {
-            const { text: sum } = await RealOpenAIAgents.summarizeChunk(chunk, SUMMARY_MODEL, SUMMARY_TOKENS);
-            return sum;
-          }
-          return chunk;
-        })
-      );
-
-      // 5. Run each agent across all chunks
+      // 3. Use chunks from PaperChunker only
+      const chunks = processed.chunks.map(chunk => chunk.content);
+      // 4. Run each agent across all chunks
       const perAgent = await Promise.all(
         RealOpenAIAgents.agentIds().map(async (agentId) => {
           const t0 = Date.now();
@@ -125,10 +105,8 @@ export class AgentOrchestrator {
           return { agentId, results, durationMs: Date.now() - t0 };
         })
       );
-
       const totalDurationMs = Date.now() - startAll;
-
-      // 6. Aggregate
+      // 5. Aggregate
       const allResults = perAgent.flatMap(a => a.results);
       const confidences = allResults.map(r => r.confidence);
       const avgConfidence = confidences.reduce((s, c) => s + c, 0) / confidences.length;
@@ -136,7 +114,7 @@ export class AgentOrchestrator {
       const keyFindings = allResults.flatMap(r => r.findings);
       const recommendations = allResults.flatMap(r => r.recommendations);
 
-      // 7. Persist final
+      // 6. Persist final
       await AnalysisStorage.store(analysisId, {
         analysisId,
         documentName: file.name,
@@ -157,13 +135,22 @@ export class AgentOrchestrator {
         error: '',
         timestamps: { started: startAll, finished: Date.now() },
       });
-    } catch (err) {
+
+      return {
+        perAgent,
+        allResults,
+        confidences,
+        totalDurationMs,
+        // ...add any other fields as needed
+      };
+    } catch (error) {
       await AnalysisStorage.store(analysisId, {
         analysisId,
         status: 'failed',
-        error: (err as Error).message,
+        error: (error as Error).message,
         timestamp: new Date().toISOString(),
       });
+      throw error;
     }
   }
 }
