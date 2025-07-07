@@ -83,21 +83,24 @@ export class AgentOrchestrator {
             const allResults = perAgent.flatMap(a => a.results);
             const confidences = allResults.map(r => r.confidence);
             const recommendations = allResults.flatMap(r => r.recommendations);
-            // 6. Persist final
-            await AnalysisStorage.store(analysisId, {
+            // 6. Persist final (API-compatible structure)
+            const resultObject = {
                 analysisId,
+                documentName: processed.metadata.fileName,
+                reviewMode,
+                timestamp: new Date().toISOString(),
                 status: 'completed',
-                results: allResults,
-                confidences,
+                error: '',
+                overallScore: 0, // TODO: calculate if needed
+                confidence: confidences.length ? Math.max(...confidences) : 0,
+                summary: '', // TODO: add summary if available
+                keyFindings: [], // TODO: extract from agent results if needed
                 recommendations,
-                timestamps: { started: startAll, finished: Date.now() },
-            });
-            return {
-                perAgent,
-                allResults,
-                confidences,
-                totalDurationMs,
+                agentResults: allResults,
+                detailedAnalysis: {}, // TODO: fill if you have per-agent details
             };
+            await AnalysisStorage.store(analysisId, resultObject);
+            return resultObject;
         }
         catch (error) {
             await AnalysisStorage.store(analysisId, {
