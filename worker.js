@@ -1,5 +1,6 @@
 import { RealAnalysisOrchestrator } from './dist/lib/real-analysis-orchestrator.worker.js';
 import { kv } from '@vercel/kv';
+import { storeAnalysis } from './dist/lib/kv-storage.js';
 
 console.log('Worker starting...');
 
@@ -21,7 +22,10 @@ async function processJob(jobId) {
 
     // Process the document
     const orchestrator = new RealAnalysisOrchestrator();
-    const result = await orchestrator.processDocumentAsync(jobData.file);
+    const result = await orchestrator.processDocumentAsync(jobData);
+
+    // Store the completed analysis result for the results API
+    await storeAnalysis(jobId, result);
 
     // Update job with results
     await kv.set(`job:${jobId}`, { 
