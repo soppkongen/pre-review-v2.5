@@ -1,4 +1,4 @@
-import { searchPhysicsKnowledge } from '../weaviate.js';
+import { searchPhysicsKnowledge } from '../weaviate';
 export class PhysicsAgent {
     async analyze(content) {
         // Use the real document content as the query for semantic search

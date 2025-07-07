@@ -1,4 +1,4 @@
-import { RealDocumentProcessor } from '../real-document-processor';
+import { RealDocumentProcessor, FileLike } from '../real-document-processor';
 import { RealOpenAIAgents } from '../real-openai-agents';
 import { AnalysisStorage } from '../kv-storage';
 import { searchPhysicsKnowledge } from '../weaviate';
@@ -57,7 +57,7 @@ export class AgentOrchestrator {
   }
 
   async analyzeDocument(
-    file: File,
+    file: FileLike,
     summary?: string,
     reviewMode: string = 'full'
   ): Promise<string> {
@@ -78,7 +78,7 @@ export class AgentOrchestrator {
 
   async processDocumentAsync(
     analysisId: string,
-    file: File,
+    file: FileLike,
     summary?: string,
     reviewMode: string = 'full'
   ) {

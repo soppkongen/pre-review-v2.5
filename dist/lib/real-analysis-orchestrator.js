@@ -1,6 +1,6 @@
 import { RealDocumentProcessor } from './real-document-processor.worker.js';
-import { PhysicsAgent } from './agents/physicsAgent.js';
-import { OpenAIRateLimiter } from './ai/rate-limiter.js';
+import { PhysicsAgent } from './agents/physicsAgent';
+import { OpenAIRateLimiter } from './ai/rate-limiter';
 const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 2000, concurrency: 1 });
 export class RealAnalysisOrchestrator {
     async processDocumentAsync(file) {

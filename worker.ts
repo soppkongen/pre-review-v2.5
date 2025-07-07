@@ -1,9 +1,10 @@
 import './lib/real-document-processor.js';
-import { dequeueJob, setJobStatus, setJobResult } from './lib/kv-job-queue.js';
+import { dequeueJob, setJobStatus, setJobResult, AnalysisJob } from './lib/kv-job-queue.js';
 import { AgentOrchestrator } from './lib/services/agent-orchestrator.js';
+import type { FileLike } from './lib/real-document-processor.js';
 
 // Helper to reconstruct a File-like object from job data
-function makeFileFromJob(job) {
+function makeFileFromJob(job: AnalysisJob): FileLike {
   const buffer = Buffer.from(job.paperContent, 'base64');
   // Node.js doesn't have File, so we create a minimal compatible object
   return {
@@ -15,7 +16,7 @@ function makeFileFromJob(job) {
   };
 }
 
-async function processJob(job) {
+async function processJob(job: AnalysisJob) {
   console.log(`[Worker] Processing job ${job.id}...`);
   await setJobStatus(job.id, 'running');
   try {

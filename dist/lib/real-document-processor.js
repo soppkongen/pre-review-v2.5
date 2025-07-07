@@ -1,4 +1,4 @@
-import { PaperChunker } from './processors/paper-chunker.js';
+import { PaperChunker } from './processors/paper-chunker';
 const chunker = new PaperChunker();
 export const RealDocumentProcessor = {
     async processFile(file) {

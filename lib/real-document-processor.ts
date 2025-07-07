@@ -1,5 +1,11 @@
 import { PaperChunker, Chunk } from './processors/paper-chunker';
 
+export interface FileLike {
+  name: string;
+  type: string;
+  text(): Promise<string>;
+}
+
 export interface ProcessedDocument {
   chunks: Chunk[];
   metadata: { fileType: string; fileName: string };
@@ -12,7 +18,7 @@ export interface ProcessedDocument {
 const chunker = new PaperChunker();
 
 export const RealDocumentProcessor = {
-  async processFile(file: File): Promise<ProcessedDocument> {
+  async processFile(file: FileLike): Promise<ProcessedDocument> {
     const text = await file.text();
     const chunks = chunker.chunkText(text);
 
