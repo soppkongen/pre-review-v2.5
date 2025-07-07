@@ -39,15 +39,16 @@ export async function getWeaviateClient(): Promise<WeaviateClient | null> {
 }
 
 /**
- * Fetches the full Weaviate schema.
+ * Fetches the full Weaviate schema (v3+ API: listAll collections).
  */
 export async function getSchema(): Promise<any | null> {
   const client = await getWeaviateClient();
   if (!client) return null;
 
   try {
-    const schema = await (client as any).schema.getter().do();
-    return schema;
+    // v3+ API: list all collections (schema)
+    const collections = await client.collections.listAll();
+    return collections;
   } catch (error) {
     console.error('[Weaviate] Failed to get schema:', error);
     return null;
@@ -55,7 +56,7 @@ export async function getSchema(): Promise<any | null> {
 }
 
 /**
- * Searches the PhysicsChunk class using a nearText query.
+ * Searches the PhysicsChunk collection using a nearText query (v3+ client API).
  */
 export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<any[]> {
   const client = await getWeaviateClient();
@@ -65,34 +66,14 @@ export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<
   }
 
   try {
-    const graphqlClient = (client as any).graphql;
-    if (!graphqlClient || typeof graphqlClient.get !== 'function') {
-      console.error('[Weaviate] graphql property not found on client:', client);
+    // v3+ API: use collections.get and .query.nearText
+    const collection = client.collections.get('PhysicsChunk');
+    const result = await collection.query.nearText(query, { limit });
+    if (!result || !result.objects) {
+      console.error('[Weaviate] Unexpected response:', result);
       return [];
     }
-    const response = await graphqlClient.get()
-      .withClassName('PhysicsChunk')
-      .withFields(`
-        chunkId
-        content
-        sourceDocument
-        domain
-        subdomain
-        contentType
-        difficultyLevel
-        concepts
-        prerequisites
-        source
-      `)
-      .withNearText({ concepts: [query] })
-      .withLimit(limit)
-      .do();
-
-    if (!response || !response.data || !response.data.Get || !response.data.Get.PhysicsChunk) {
-      console.error('[Weaviate] Unexpected response:', response);
-      return [];
-    }
-    return response.data.Get.PhysicsChunk;
+    return result.objects;
   } catch (error) {
     console.error('[searchPhysicsKnowledge] Weaviate query failed:', error);
     return [];
