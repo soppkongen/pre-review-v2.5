@@ -1,6 +1,8 @@
-import './lib/real-document-processor.js';
-import { dequeueJob, setJobStatus, setJobResult } from './lib/kv-job-queue.js';
-import { AgentOrchestrator } from './lib/services/agent-orchestrator.js';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+require("./lib/real-document-processor.js");
+const kv_job_queue_js_1 = require("./lib/kv-job-queue.js");
+const agent_orchestrator_js_1 = require("./lib/services/agent-orchestrator.js");
 // Helper to reconstruct a File-like object from job data
 function makeFileFromJob(job) {
     const buffer = Buffer.from(job.paperContent, 'base64');
@@ -15,25 +17,25 @@ function makeFileFromJob(job) {
 }
 async function processJob(job) {
     console.log(`[Worker] Processing job ${job.id}...`);
-    await setJobStatus(job.id, 'running');
+    await (0, kv_job_queue_js_1.setJobStatus)(job.id, 'running');
     try {
-        const orchestrator = new AgentOrchestrator();
+        const orchestrator = new agent_orchestrator_js_1.AgentOrchestrator();
         const file = makeFileFromJob(job);
         const result = await orchestrator.processDocumentAsync(job.id, file, undefined, 'full');
-        await setJobResult(job.id, result);
-        await setJobStatus(job.id, 'completed');
+        await (0, kv_job_queue_js_1.setJobResult)(job.id, result);
+        await (0, kv_job_queue_js_1.setJobStatus)(job.id, 'completed');
         console.log(`[Worker] Job ${job.id} completed.`);
     }
     catch (error) {
-        await setJobStatus(job.id, 'failed');
-        await setJobResult(job.id, { error: error instanceof Error ? error.message : String(error) });
+        await (0, kv_job_queue_js_1.setJobStatus)(job.id, 'failed');
+        await (0, kv_job_queue_js_1.setJobResult)(job.id, { error: error instanceof Error ? error.message : String(error) });
         console.error(`[Worker] Job ${job.id} failed:`, error);
     }
 }
 async function main() {
     console.log('[Worker] Started background worker.');
     while (true) {
-        const job = await dequeueJob();
+        const job = await (0, kv_job_queue_js_1.dequeueJob)();
         if (job) {
             await processJob(job);
         }

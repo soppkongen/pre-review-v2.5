@@ -1,17 +1,25 @@
-import { Redis } from '@upstash/redis';
-const redis = new Redis({
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.enqueueJob = enqueueJob;
+exports.dequeueJob = dequeueJob;
+exports.setJobStatus = setJobStatus;
+exports.getJobStatus = getJobStatus;
+exports.setJobResult = setJobResult;
+exports.getJobResult = getJobResult;
+const redis_1 = require("@upstash/redis");
+const redis = new redis_1.Redis({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
 });
 const JOB_QUEUE_KEY = 'analysis:job-queue';
 const JOB_STATUS_PREFIX = 'analysis:status:';
 const JOB_RESULT_PREFIX = 'analysis:result:';
-export async function enqueueJob(job) {
+async function enqueueJob(job) {
     await redis.rpush(JOB_QUEUE_KEY, JSON.stringify(job));
     await setJobStatus(job.id, 'pending');
     await redis.set(`job:${job.id}`, { ...job, status: 'pending' });
 }
-export async function dequeueJob() {
+async function dequeueJob() {
     const res = await redis.lpop(JOB_QUEUE_KEY);
     if (!res || typeof res !== 'string' || !res.trim().startsWith('{'))
         return null;
@@ -23,16 +31,16 @@ export async function dequeueJob() {
         return null;
     }
 }
-export async function setJobStatus(jobId, status) {
+async function setJobStatus(jobId, status) {
     await redis.set(JOB_STATUS_PREFIX + jobId, status);
 }
-export async function getJobStatus(jobId) {
+async function getJobStatus(jobId) {
     return (await redis.get(JOB_STATUS_PREFIX + jobId));
 }
-export async function setJobResult(jobId, result) {
+async function setJobResult(jobId, result) {
     await redis.set(JOB_RESULT_PREFIX + jobId, JSON.stringify(result));
 }
-export async function getJobResult(jobId) {
+async function getJobResult(jobId) {
     const res = await redis.get(JOB_RESULT_PREFIX + jobId);
     if (!res)
         return null;

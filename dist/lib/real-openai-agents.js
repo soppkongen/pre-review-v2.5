@@ -1,7 +1,13 @@
-import OpenAI from "openai";
-import { OpenAIRateLimiter } from './ai/rate-limiter.js';
-const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 3000, concurrency: 1, maxRetries: 2 });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RealOpenAIAgents = void 0;
+const openai_1 = __importDefault(require("openai"));
+const rate_limiter_1 = require("./ai/rate-limiter");
+const rateLimiter = new rate_limiter_1.OpenAIRateLimiter({ minIntervalMs: 3000, concurrency: 1, maxRetries: 2 });
+const openai = new openai_1.default({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 async function callOpenAI(role, prompt, model, maxTokens) {
     const t0 = Date.now();
@@ -16,7 +22,7 @@ async function callOpenAI(role, prompt, model, maxTokens) {
     }));
     return { text: res.choices[0]?.message?.content?.trim() || '', durationMs: Date.now() - t0 };
 }
-export const RealOpenAIAgents = {
+exports.RealOpenAIAgents = {
     async summarizeChunk(text, model = MODEL, maxTokens) {
         const prompt = `Summarize this text in up to ${maxTokens} tokens:\n\n${text}`;
         const { text: sum } = await callOpenAI('summarizer', prompt, model, maxTokens);

@@ -1,12 +1,15 @@
-import { RealDocumentProcessor } from '../real-document-processor.js';
-import { RealOpenAIAgents } from '../real-openai-agents.js';
-import { AnalysisStorage } from '../kv-storage';
-import { searchPhysicsKnowledge } from '../weaviate';
-import { v4 as uuidv4 } from 'uuid';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AgentOrchestrator = void 0;
+const real_document_processor_1 = require("../real-document-processor");
+const real_openai_agents_1 = require("../real-openai-agents");
+const kv_storage_1 = require("../kv-storage");
+const weaviate_1 = require("../weaviate");
+const uuid_1 = require("uuid");
 const MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 const SUMMARY_MODEL = MODEL;
 const SUMMARY_TOKENS = 300;
-export class AgentOrchestrator {
+class AgentOrchestrator {
     // Add the missing methods for streaming
     getAgents() {
         return [
@@ -18,9 +21,9 @@ export class AgentOrchestrator {
     async analyzeWithAgent(agentId, paperContent, paperTitle) {
         try {
             // Get knowledge context
-            const knowledge = await searchPhysicsKnowledge(paperContent.slice(0, 200), 3);
+            const knowledge = await (0, weaviate_1.searchPhysicsKnowledge)(paperContent.slice(0, 200), 3);
             // Run the specific agent
-            const result = await RealOpenAIAgents.runAgent(agentId, {
+            const result = await real_openai_agents_1.RealOpenAIAgents.runAgent(agentId, {
                 text: paperContent,
                 context: knowledge.map(k => k.content)
             });
@@ -44,8 +47,8 @@ export class AgentOrchestrator {
         }
     }
     async analyzeDocument(file, summary, reviewMode = 'full') {
-        const analysisId = uuidv4();
-        await AnalysisStorage.store(analysisId, {
+        const analysisId = (0, uuid_1.v4)();
+        await kv_storage_1.AnalysisStorage.store(analysisId, {
             analysisId,
             documentName: file.name,
             reviewMode,
@@ -61,20 +64,20 @@ export class AgentOrchestrator {
         const startAll = Date.now();
         try {
             // 1. Ingest & chunk (only once)
-            const processed = await RealDocumentProcessor.processFile(file);
+            const processed = await real_document_processor_1.RealDocumentProcessor.processFile(file);
             const fullText = processed.getContent();
             // 2. RAG (first 200 chars)
-            const knowledge = await searchPhysicsKnowledge(fullText.slice(0, 200), 5);
-            await AnalysisStorage.store(analysisId, { status: 'running', timestamp: new Date().toISOString() });
+            const knowledge = await (0, weaviate_1.searchPhysicsKnowledge)(fullText.slice(0, 200), 5);
+            await kv_storage_1.AnalysisStorage.store(analysisId, { status: 'running', timestamp: new Date().toISOString() });
             // 3. Use chunks from PaperChunker only
             const chunks = processed.chunks.map(chunk => chunk.content);
             console.log(`[Orchestrator] Number of chunks: ${chunks.length}`);
             // 4. Run each agent across all chunks
-            const perAgent = await Promise.all(RealOpenAIAgents.agentIds().map(async (agentId) => {
+            const perAgent = await Promise.all(real_openai_agents_1.RealOpenAIAgents.agentIds().map(async (agentId) => {
                 const t0 = Date.now();
                 const results = [];
                 for (const chunk of chunks) {
-                    results.push(await RealOpenAIAgents.runAgent(agentId, { text: chunk, context: knowledge }));
+                    results.push(await real_openai_agents_1.RealOpenAIAgents.runAgent(agentId, { text: chunk, context: knowledge }));
                 }
                 return { agentId, results, durationMs: Date.now() - t0 };
             }));
@@ -99,11 +102,11 @@ export class AgentOrchestrator {
                 agentResults: allResults,
                 detailedAnalysis: {}, // TODO: fill if you have per-agent details
             };
-            await AnalysisStorage.store(analysisId, resultObject);
+            await kv_storage_1.AnalysisStorage.store(analysisId, resultObject);
             return resultObject;
         }
         catch (error) {
-            await AnalysisStorage.store(analysisId, {
+            await kv_storage_1.AnalysisStorage.store(analysisId, {
                 analysisId,
                 status: 'failed',
                 error: error.message,
@@ -113,3 +116,4 @@ export class AgentOrchestrator {
         }
     }
 }
+exports.AgentOrchestrator = AgentOrchestrator;

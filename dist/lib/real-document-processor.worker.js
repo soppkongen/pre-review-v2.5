@@ -1,6 +1,9 @@
-import { PaperChunker } from './processors/paper-chunker.js';
-const chunker = new PaperChunker();
-export const RealDocumentProcessor = {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RealDocumentProcessor = void 0;
+const paper_chunker_js_1 = require("./processors/paper-chunker.js");
+const chunker = new paper_chunker_js_1.PaperChunker();
+exports.RealDocumentProcessor = {
     async processFile(file) {
         const text = await file.text();
         const chunks = chunker.chunkText(text);

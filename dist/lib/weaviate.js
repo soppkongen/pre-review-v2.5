@@ -1,4 +1,12 @@
-import weaviate from 'weaviate-client';
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getWeaviateClient = getWeaviateClient;
+exports.getSchema = getSchema;
+exports.searchPhysicsKnowledge = searchPhysicsKnowledge;
+const weaviate_client_1 = __importDefault(require("weaviate-client"));
 const weaviateURL = process.env.WEAVIATE_URL;
 const weaviateApiKey = process.env.WEAVIATE_API_KEY;
 const openaiApiKey = process.env.OPENAI_APIKEY;
@@ -6,7 +14,7 @@ let client = null;
 /**
  * Returns a singleton Weaviate client connected to your cloud instance.
  */
-export async function getWeaviateClient() {
+async function getWeaviateClient() {
     if (client)
         return client;
     if (!weaviateURL) {
@@ -22,8 +30,8 @@ export async function getWeaviateClient() {
         return null;
     }
     try {
-        client = await weaviate.connectToWeaviateCloud(weaviateURL, {
-            authCredentials: new weaviate.ApiKey(weaviateApiKey),
+        client = await weaviate_client_1.default.connectToWeaviateCloud(weaviateURL, {
+            authCredentials: new weaviate_client_1.default.ApiKey(weaviateApiKey),
             headers: { 'X-Openai-Api-Key': openaiApiKey },
         });
         const ready = await client.isReady();
@@ -41,7 +49,7 @@ export async function getWeaviateClient() {
 /**
  * Fetches the full Weaviate schema (v3+ API: listAll collections).
  */
-export async function getSchema() {
+async function getSchema() {
     const client = await getWeaviateClient();
     if (!client)
         return null;
@@ -58,7 +66,7 @@ export async function getSchema() {
 /**
  * Searches the PhysicsChunk collection using a nearText query (v3+ client API).
  */
-export async function searchPhysicsKnowledge(query, limit = 5) {
+async function searchPhysicsKnowledge(query, limit = 5) {
     const client = await getWeaviateClient();
     if (!client) {
         console.error('[Weaviate] Client not initialized');

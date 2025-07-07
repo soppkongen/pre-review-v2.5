@@ -1,11 +1,14 @@
-import { RealDocumentProcessor } from './real-document-processor.worker.js';
-import { PhysicsAgent } from './agents/physicsAgent.worker.js';
-import { OpenAIRateLimiter } from './ai/rate-limiter.js';
-const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 2000, concurrency: 1 });
-export class RealAnalysisOrchestrator {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RealAnalysisOrchestrator = void 0;
+const real_document_processor_worker_js_1 = require("./real-document-processor.worker.js");
+const physicsAgent_worker_js_1 = require("./agents/physicsAgent.worker.js");
+const rate_limiter_js_1 = require("./ai/rate-limiter.js");
+const rateLimiter = new rate_limiter_js_1.OpenAIRateLimiter({ minIntervalMs: 2000, concurrency: 1 });
+class RealAnalysisOrchestrator {
     async processDocumentAsync(file, analysisId, reviewMode = 'full') {
-        const processed = await RealDocumentProcessor.processFile(file);
-        const physicsAgent = new PhysicsAgent();
+        const processed = await real_document_processor_worker_js_1.RealDocumentProcessor.processFile(file);
+        const physicsAgent = new physicsAgent_worker_js_1.PhysicsAgent();
         const results = [];
         let allFindings = [];
         let allRecommendations = [];
@@ -60,3 +63,4 @@ export class RealAnalysisOrchestrator {
         };
     }
 }
+exports.RealAnalysisOrchestrator = RealAnalysisOrchestrator;

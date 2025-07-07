@@ -1,9 +1,12 @@
-import { encodingForModel } from "js-tiktoken";
-export class PaperChunker {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PaperChunker = void 0;
+const js_tiktoken_1 = require("js-tiktoken");
+class PaperChunker {
     constructor() {
         this.maxTokens = 4000;
         this.overlap = 200;
-        this.enc = encodingForModel("gpt-3.5-turbo");
+        this.enc = (0, js_tiktoken_1.encodingForModel)("gpt-3.5-turbo");
     }
     chunkText(fullText) {
         const tokens = this.enc.encode(fullText);
@@ -23,3 +26,4 @@ export class PaperChunker {
         return chunks;
     }
 }
+exports.PaperChunker = PaperChunker;

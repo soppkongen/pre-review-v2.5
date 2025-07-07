@@ -1,25 +1,33 @@
-import { Redis } from '@upstash/redis';
-const redis = new Redis({
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AnalysisStorage = void 0;
+exports.get = get;
+exports.set = set;
+exports.del = del;
+exports.storeAnalysis = storeAnalysis;
+exports.getAnalysisResult = getAnalysisResult;
+const redis_1 = require("@upstash/redis");
+const redis = new redis_1.Redis({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
 });
-export async function get(key) {
+async function get(key) {
     return await redis.get(key);
 }
-export async function set(key, value) {
+async function set(key, value) {
     await redis.set(key, value);
 }
-export async function del(key) {
+async function del(key) {
     await redis.del(key);
 }
-export async function storeAnalysis(id, data) {
+async function storeAnalysis(id, data) {
     await set(`analysis:${id}`, data);
 }
-export async function getAnalysisResult(id) {
+async function getAnalysisResult(id) {
     return await get(`analysis:${id}`);
 }
 // The real AnalysisStorage object
-export const AnalysisStorage = {
+exports.AnalysisStorage = {
     store: storeAnalysis,
     get: getAnalysisResult,
     set,
