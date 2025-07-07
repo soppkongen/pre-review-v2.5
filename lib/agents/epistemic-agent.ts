@@ -1,4 +1,4 @@
-import { AgentResult } from './agent-types';
+import { AgentResult } from './agent-types.js';
 
 export class EpistemicAgent {
   async run(text: string): Promise<AgentResult> {
