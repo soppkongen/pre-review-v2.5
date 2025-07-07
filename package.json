@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "next build && tsc",
-    "build:worker": "tsc -p tsconfig.worker.json",
+    "build:worker": "tsc -p tsconfig.worker.json && move dist\\worker.js dist\\worker.cjs",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
     "type-check": "tsc --noEmit",
-    "worker": "node dist/worker.js",
+    "worker": "node dist/worker.cjs",
     "worker:dev": "ts-node --loader ts-node/esm worker.ts"
   },
   "dependencies": {
