@@ -7,8 +7,8 @@ export interface Chunk {
 }
 
 export class PaperChunker {
-  private readonly maxTokens = 512;
-  private readonly overlap = 50;
+  private readonly maxTokens = 4000;
+  private readonly overlap = 200;
   private readonly enc = encodingForModel("gpt-3.5-turbo");
 
   public chunkText(fullText: string): Chunk[] {

@@ -1,6 +1,7 @@
 import weaviate from 'weaviate-client';
 const weaviateURL = process.env.WEAVIATE_URL;
 const weaviateApiKey = process.env.WEAVIATE_API_KEY;
+const openaiApiKey = process.env.OPENAI_APIKEY;
 let client = null;
 /**
  * Returns a singleton Weaviate client connected to your cloud instance.
@@ -16,9 +17,14 @@ export async function getWeaviateClient() {
         console.warn('[Weaviate] Missing WEAVIATE_API_KEY environment variable');
         return null;
     }
+    if (!openaiApiKey) {
+        console.warn('[Weaviate] Missing OPENAI_APIKEY environment variable');
+        return null;
+    }
     try {
         client = await weaviate.connectToWeaviateCloud(weaviateURL, {
             authCredentials: new weaviate.ApiKey(weaviateApiKey),
+            headers: { 'X-Openai-Api-Key': openaiApiKey },
         });
         const ready = await client.isReady();
         if (!ready) {

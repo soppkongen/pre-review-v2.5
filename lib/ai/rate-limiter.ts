@@ -14,8 +14,8 @@ export class OpenAIRateLimiter {
   private readonly maxRetries: number;
 
   constructor(config: RateLimiterConfig = {}) {
-    this.minIntervalMs = config.minIntervalMs || 2000; // 2 seconds between requests
-    this.maxRetries = config.maxRetries || 2; // Reduced retries
+    this.minIntervalMs = config.minIntervalMs || 1000; // Reduced to 1 second between requests
+    this.maxRetries = config.maxRetries || 3; // Increased retries for better resilience
   }
 
   async schedule<T>(fn: () => Promise<T>): Promise<T> {
@@ -53,8 +53,12 @@ export class OpenAIRateLimiter {
       resolve(result);
     } catch (err: any) {
       if (err.status === 429 && attempt <= this.maxRetries) {
-        // exponential backoff with shorter delays
-        const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000);
+        // Improved exponential backoff with jitter
+        const baseDelay = 2000; // Start with 2 seconds
+        const maxDelay = 30000; // Max 30 seconds
+        const backoff = Math.min(baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000, maxDelay);
+        
+        console.log(`[RateLimiter] 429 error, retrying in ${Math.round(backoff)}ms (attempt ${attempt}/${this.maxRetries})`);
         await new Promise(r => setTimeout(r, backoff));
         return this.execute(fn, resolve, reject, attempt + 1);
       }

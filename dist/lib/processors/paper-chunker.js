@@ -1,8 +1,8 @@
 import { encodingForModel } from "js-tiktoken";
 export class PaperChunker {
     constructor() {
-        this.maxTokens = 512;
-        this.overlap = 50;
+        this.maxTokens = 4000;
+        this.overlap = 200;
         this.enc = encodingForModel("gpt-3.5-turbo");
     }
     chunkText(fullText) {

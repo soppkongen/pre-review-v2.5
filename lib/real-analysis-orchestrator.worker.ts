@@ -2,7 +2,7 @@ import { RealDocumentProcessor, ProcessedDocument } from './real-document-proces
 import { PhysicsAgent } from './agents/physicsAgent.worker.js';
 import { OpenAIRateLimiter } from './ai/rate-limiter.js';
 
-const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 6000, concurrency: 1 });
+const rateLimiter = new OpenAIRateLimiter({ minIntervalMs: 2000, concurrency: 1 });
 
 export class RealAnalysisOrchestrator {
   async processDocumentAsync(file: File, analysisId?: string, reviewMode: string = 'full') {
@@ -14,8 +14,11 @@ export class RealAnalysisOrchestrator {
     let agentResults: any[] = [];
     let confidences: number[] = [];
 
+    console.log(`[Orchestrator] Processing ${processed.chunks.length} chunks (was ~100+ before optimization)`);
+
     for (const { id, content } of processed.chunks) {
       const t0 = Date.now();
+      console.log(`[Orchestrator] Processing chunk ${id + 1}/${processed.chunks.length}`);
       const res = await rateLimiter.schedule(() => physicsAgent.analyze(content));
       results.push({ chunkId: id, result: res, durationMs: Date.now() - t0 });
       if (res.summary) allFindings.push(res.summary);
