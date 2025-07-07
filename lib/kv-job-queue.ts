@@ -13,6 +13,8 @@ export type AnalysisJob = {
   id: string;
   paperContent: string;
   paperTitle: string;
+  fileName: string;
+  fileType: string;
   createdAt: string;
 };
 
