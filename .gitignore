@@ -29,3 +29,6 @@ next-env.d.ts
 # best practice ignores
 /dist/
 /*.js
+
+dist/
+.next/
