@@ -59,10 +59,18 @@ export async function getSchema(): Promise<any | null> {
  */
 export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<any[]> {
   const client = await getWeaviateClient();
-  if (!client) return [];
+  if (!client) {
+    console.error('[Weaviate] Client not initialized');
+    return [];
+  }
 
   try {
-    const response = await (client as any).graphql.get()
+    const graphqlClient = (client as any).graphql;
+    if (!graphqlClient || typeof graphqlClient.get !== 'function') {
+      console.error('[Weaviate] graphql property not found on client:', client);
+      return [];
+    }
+    const response = await graphqlClient.get()
       .withClassName('PhysicsChunk')
       .withFields(`
         chunkId
@@ -80,7 +88,11 @@ export async function searchPhysicsKnowledge(query: string, limit = 5): Promise<
       .withLimit(limit)
       .do();
 
-    return response.data.Get.PhysicsChunk || [];
+    if (!response || !response.data || !response.data.Get || !response.data.Get.PhysicsChunk) {
+      console.error('[Weaviate] Unexpected response:', response);
+      return [];
+    }
+    return response.data.Get.PhysicsChunk;
   } catch (error) {
     console.error('[searchPhysicsKnowledge] Weaviate query failed:', error);
     return [];
