@@ -23,6 +23,7 @@ export type JobStatus = 'pending' | 'running' | 'completed' | 'failed';
 export async function enqueueJob(job: AnalysisJob) {
   await (redis as any).rpush(JOB_QUEUE_KEY, JSON.stringify(job));
   await setJobStatus(job.id, 'pending');
+  await redis.set(`job:${job.id}`, { ...job, status: 'pending' });
 }
 
 export async function dequeueJob(): Promise<AnalysisJob | null> {
