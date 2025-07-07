@@ -1,4 +1,4 @@
-import './lib/real-document-processor.js';
+import './lib/real-document-processor.cjs';
 import { dequeueJob, setJobStatus, setJobResult, AnalysisJob } from '../lib/kv-job-queue';
 import { AgentOrchestrator } from '../lib/services/agent-orchestrator';
 import type { FileLike } from '../lib/real-document-processor';
