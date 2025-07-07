@@ -3,14 +3,14 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "node",
-    "outDir": "dist",
+    "outDir": "dist/worker",
     "noEmit": false,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true
   },
   "include": [
-    "worker.ts",
+    "worker/worker.ts",
     "lib/**/*.ts"
   ],
   "exclude": [
