@@ -1,8 +1,8 @@
 import { Redis } from '@upstash/redis';
 
 const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
+  url: process.env.PAPERWORK_KV_REST_API_URL!,
+  token: process.env.PAPERWORK_KV_REST_API_TOKEN!,
 });
 
 export async function get<T = any>(key: string): Promise<T | null> {
@@ -22,6 +22,14 @@ export async function storeAnalysis(id: string, data: any) {
 }
 
 export async function getAnalysisResult(id: string) {
+  // First try the job result location (where worker stores results)
+  const jobResult = await get(`analysis:result:${id}`);
+  if (jobResult) {
+    // Parse if it's a JSON string, otherwise return as-is
+    return typeof jobResult === 'string' ? JSON.parse(jobResult) : jobResult;
+  }
+  
+  // Fallback to the old location for backward compatibility
   return await get(`analysis:${id}`);
 }
 
